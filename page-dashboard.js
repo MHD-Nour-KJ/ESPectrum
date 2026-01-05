@@ -105,8 +105,8 @@ export default {
     // Initialize widgets
     this.initializeWidgets(container);
 
-    // Subscribe to uptime updates
-    this.subscribeToUptime();
+    // Subscribe to store updates
+    this.subscribeToData();
 
     // Cleanup function
     return () => this.cleanup();
