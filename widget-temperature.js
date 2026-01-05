@@ -36,8 +36,8 @@ export default class TemperatureWidget {
             color: '#FF864A'
         });
 
-        // Subscribe to store
-        this.subscribeToStore();
+        // Initial render logic ends here.
+        // We no longer call subscribeToStore() here.
     }
 
     update(value) {
@@ -53,23 +53,6 @@ export default class TemperatureWidget {
                 this.gauge.setColor('#10B981'); // Green - normal
             }
         }
-    }
-
-    subscribeToStore() {
-        this.unsubscribe = store.subscribe('sensorData', (data) => {
-            if (data && data.temp !== undefined) {
-                this.gauge.update(data.temp);
-
-                // Change color based on temperature
-                if (data.temp > 60) {
-                    this.gauge.setColor('#EF4444'); // Red - hot
-                } else if (data.temp > 45) {
-                    this.gauge.setColor('#FF864A'); // Orange - warm
-                } else {
-                    this.gauge.setColor('#10B981'); // Green - normal
-                }
-            }
-        });
     }
 
     cleanup() {

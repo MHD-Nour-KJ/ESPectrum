@@ -113,10 +113,18 @@ class MQTTService {
     handleDataMessage(message) {
         // Sensor Data
         if (message.type === 'sensor_data') {
-            // ESP32 sends flat JSON: { type: "sensor_data", temp: 25, touch: 0 ... }
-            // Store expects an object with these keys.
+            // Unify structure: Hardware is flat, Mock has .data
+            const actualData = message.data || message;
+
+            // Dispatch specifically the sensor fields to the store
             store.dispatch('SENSOR_DATA_UPDATE', {
-                sensorData: message // Pass the whole message as the data object
+                sensorData: {
+                    touch: actualData.touch,
+                    hall: actualData.hall,
+                    temp: actualData.temp,
+                    rssi: actualData.rssi,
+                    uptime: actualData.uptime
+                }
             });
         }
         // System Events (Sleep/Wake)

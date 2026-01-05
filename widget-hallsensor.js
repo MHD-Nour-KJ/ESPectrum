@@ -32,8 +32,8 @@ export default class HallSensorWidget {
             maxDataPoints: 50
         });
 
-        // Subscribe to store
-        this.subscribeToStore();
+        // Initial render logic ends here. 
+        // We no longer call subscribeToStore() here.
     }
 
     update(value) {
@@ -41,15 +41,6 @@ export default class HallSensorWidget {
             const timestamp = formatTime(Date.now());
             this.chart.addData(timestamp, value);
         }
-    }
-
-    subscribeToStore() {
-        this.unsubscribe = store.subscribe('sensorData', (data) => {
-            if (data && data.hall !== undefined) {
-                const timestamp = formatTime(Date.now());
-                this.chart.addData(timestamp, data.hall);
-            }
-        });
     }
 
     cleanup() {

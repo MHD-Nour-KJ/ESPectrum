@@ -150,6 +150,9 @@ export default {
       store.subscribe('sensorData', (data) => {
         if (!data) return;
 
+        // Logging for verification (Phase 4 Debugging)
+        console.log(`[Dashboard] Data Received - Hall: ${data.hall}, Temp: ${data.temp}, RSSI: ${data.rssi}`);
+
         // 1. Update Uptime & RSSI
         const uptimeDisplay = document.getElementById('uptime-display');
         if (uptimeDisplay && data.uptime !== undefined) {
@@ -162,16 +165,22 @@ export default {
         }
 
         // 2. Update Widgets (Mapping fields from ESP32 JSON)
-        // Widgets are stored in order: [Touch, Hall, Temp, Sleep]
+        // Widgets are stored in order: [0:Touch, 1:Hall, 2:Temp, 3:Sleep]
         if (this.widgets.length >= 3) {
-          // Touch Pins (data.touch)
-          if (data.touch !== undefined) this.widgets[0].update(data.touch);
+          // Touch Pins (Index 0)
+          if (data.touch !== undefined) {
+            this.widgets[0].update(data.touch);
+          }
 
-          // Hall Sensor (data.hall)
-          if (data.hall !== undefined) this.widgets[1].update(data.hall);
+          // Hall Sensor (Index 1) - ONLY update with data.hall
+          if (data.hall !== undefined) {
+            this.widgets[1].update(data.hall);
+          }
 
-          // Temperature (data.temp)
-          if (data.temp !== undefined) this.widgets[2].update(data.temp);
+          // Temperature (Index 2) - ONLY update with data.temp
+          if (data.temp !== undefined) {
+            this.widgets[2].update(data.temp);
+          }
         }
       })
     );

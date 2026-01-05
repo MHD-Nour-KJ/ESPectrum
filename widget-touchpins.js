@@ -106,26 +106,29 @@ export default class TouchPinsWidget {
   }
 
   updatePins(touchData) {
-    // Convert single number to array format (T4 is at index 4)
-    if (typeof touchData === 'number') {
-      const pins = Array(10).fill(0);
-      pins[4] = touchData;
-      touchData = pins;
+    // If we get an array from the new firmware, use it directly
+    if (Array.isArray(touchData)) {
+      this.pins = touchData;
+    }
+    // Fallback for single number (e.g. older firmware)
+    else if (typeof touchData === 'number') {
+      this.pins = Array(10).fill(0);
+      this.pins[0] = touchData; // GPIO 4 is T0, so map to index 0
     }
 
-    if (!Array.isArray(touchData)) return;
-
-    touchData.forEach((value, index) => {
+    this.pins.forEach((value, index) => {
       const fill = this.container.querySelector(`[data-pin-fill="${index}"]`);
       const valueDisplay = this.container.querySelector(`[data-pin-value="${index}"]`);
 
       if (fill && valueDisplay) {
-        // Map touch value (0-1023) to percentage
-        const percentage = (value / 1023) * 100;
+        // Map touch value (typically 0-100 on ESP32) to percentage
+        // Note: touchRead returns LOWER values when touched, but we map 0-100 for display
+        const percentage = Math.min(100, Math.max(0, value));
         fill.style.height = `${percentage}%`;
 
-        // Add active class if touched
-        if (value > 100) {
+        // Active if value is low (touched) or high depending on calibration
+        // Standard ESP32: ~70-80 untouched, ~10-20 touched
+        if (value < 30 && value > 0) {
           fill.classList.add('active');
         } else {
           fill.classList.remove('active');
