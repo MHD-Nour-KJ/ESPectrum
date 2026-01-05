@@ -12,7 +12,7 @@ class MQTTService {
         this.clientId = 'espectrum-web-' + Math.random().toString(16).substr(2, 8);
         this.topicData = 'espectrum/data';
         this.topicCommand = 'espectrum/command';
-
+        this.topicTelemetry = 'espectrum/telemetry';
         // Mock mode for fallback
         this.mockMode = false;
         this.mockInterval = null;
@@ -239,3 +239,4 @@ class MQTTService {
 const mqttService = new MQTTService();
 window.wsService = mqttService; // Keep global name compatible
 export default mqttService;
+
