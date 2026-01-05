@@ -11,8 +11,9 @@ class MQTTService {
         this.token = 'AS2wNDPtK056fOhQAQdcEOdx3ceJ0dPmEioS81O0q2ytBvxW8FM5uIcQ3m3C4FOc';
         this.clientId = 'espectrum-web-' + Math.random().toString(16).substr(2, 8);
         this.topicData = 'espectrum/data';
-        this.topicCommand = 'espectrum/command';
         this.topicTelemetry = 'espectrum/telemetry';
+        this.topicCommand = 'espectrum/command';
+
         // Mock mode for fallback
         this.mockMode = false;
         this.mockInterval = null;
@@ -55,12 +56,18 @@ class MQTTService {
 
         // Subscribe to data topic
         this.client.subscribe(this.topicData, (err) => {
-                if (!err) console.log(`[MQTT] Subscribed to ${this.topicData}`);
+            if (!err) console.log(`[MQTT] Subscribed to ${this.topicData}`);
         });
 
         // Subscribe to telemetry topic
         this.client.subscribe(this.topicTelemetry, (err) => {
             if (!err) console.log(`[MQTT] Subscribed to ${this.topicTelemetry}`);
+        });
+
+        store.dispatch('WS_CONNECTED', {
+            connected: true,
+            mockMode: false,
+            systemStatus: 'connected'
         });
     }
 
@@ -76,7 +83,7 @@ class MQTTService {
                 console.log('[MQTT] RX:', topic, message);
             }
 
-            if (topic === this.topicData) {
+            if (topic === this.topicData || topic === this.topicTelemetry) {
                 this.handleDataMessage(message);
             }
 
@@ -91,8 +98,10 @@ class MQTTService {
     handleDataMessage(message) {
         // Sensor Data
         if (message.type === 'sensor_data') {
+            // ESP32 sends flat JSON: { type: "sensor_data", temp: 25, touch: 0 ... }
+            // Store expects an object with these keys.
             store.dispatch('SENSOR_DATA_UPDATE', {
-                sensorData: message.data
+                sensorData: message // Pass the whole message as the data object
             });
         }
         // System Events (Sleep/Wake)
@@ -236,5 +245,3 @@ class MQTTService {
 const mqttService = new MQTTService();
 window.wsService = mqttService; // Keep global name compatible
 export default mqttService;
-
-
