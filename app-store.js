@@ -22,6 +22,7 @@ class Store {
             // System events
             systemStatus: 'initializing', // 'initializing', 'connected', 'disconnected', 'error'
             lastWakeup: null,
+            lastMessage: null, // For chat
 
             // User preferences (loaded from localStorage)
             theme: 'dark',
@@ -70,6 +71,10 @@ class Store {
         const prevState = { ...this.state };
 
         // Apply updates
+        if (action === 'CHAT_MESSAGE_RECEIVED') {
+            updates = { lastMessage: updates };
+        }
+
         this.state = this._deepMerge(this.state, updates);
 
         // Store in history (limit to last 50 actions)

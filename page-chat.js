@@ -113,12 +113,11 @@ export default class PageChat {
 
             // 2. Send via MQTT
             if (window.wsService) {
-                // We use a custom topic or the generic command channel for demo
-                window.wsService.send(JSON.stringify({
+                window.wsService.send({
                     type: 'chat',
                     user: 'WebClient',
                     text: text
-                }));
+                });
             }
         };
 

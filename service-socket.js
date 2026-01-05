@@ -12,6 +12,8 @@ class MQTTService {
         this.clientId = 'espectrum-web-' + Math.random().toString(16).substr(2, 8);
         this.topicData = 'espectrum/data';
         this.topicTelemetry = 'espectrum/telemetry';
+        this.topicTelemetry = 'espectrum/telemetry';
+        this.topicChat = 'espectrum/chat';
         this.topicCommand = 'espectrum/command';
 
         // Mock mode for fallback
@@ -64,6 +66,11 @@ class MQTTService {
             if (!err) console.log(`[MQTT] Subscribed to ${this.topicTelemetry}`);
         });
 
+        // Subscribe to chat topic
+        this.client.subscribe(this.topicChat, (err) => {
+            if (!err) console.log(`[MQTT] Subscribed to ${this.topicChat}`);
+        });
+
         store.dispatch('WS_CONNECTED', {
             connected: true,
             mockMode: false,
@@ -83,13 +90,22 @@ class MQTTService {
                 console.log('[MQTT] RX:', topic, message);
             }
 
-            if (topic === this.topicData || topic === this.topicTelemetry) {
+            if (topic === this.topicChat) {
+                this.handleChatMessage(message);
+            } else if (topic === this.topicData || topic === this.topicTelemetry) {
                 this.handleDataMessage(message);
             }
 
         } catch (err) {
             console.error('[MQTT] Parse error:', err);
         }
+    }
+
+    /**
+     * Handle chat messages
+     */
+    handleChatMessage(message) {
+        store.dispatch('CHAT_MESSAGE_RECEIVED', message);
     }
 
     /**
@@ -170,10 +186,17 @@ class MQTTService {
     send(message) {
         if (this.client && this.client.connected) {
             const payload = JSON.stringify(message);
-            this.client.publish(this.topicCommand, payload);
+
+            // Route to correct topic
+            let topic = this.topicCommand;
+            if (message.type === 'chat') {
+                topic = this.topicChat;
+            }
+
+            this.client.publish(topic, payload);
 
             if (window.ESPECTRUM_DEBUG) {
-                console.log('[MQTT] TX:', this.topicCommand, message);
+                console.log('[MQTT] TX:', topic, message);
             }
         } else {
             console.warn('[MQTT] Cannot send, not connected');

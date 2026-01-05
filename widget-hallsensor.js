@@ -36,6 +36,13 @@ export default class HallSensorWidget {
         this.subscribeToStore();
     }
 
+    update(value) {
+        if (this.chart) {
+            const timestamp = formatTime(Date.now());
+            this.chart.addData(timestamp, value);
+        }
+    }
+
     subscribeToStore() {
         this.unsubscribe = store.subscribe('sensorData', (data) => {
             if (data && data.hall !== undefined) {

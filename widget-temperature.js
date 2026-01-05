@@ -40,6 +40,21 @@ export default class TemperatureWidget {
         this.subscribeToStore();
     }
 
+    update(value) {
+        if (this.gauge) {
+            this.gauge.update(value);
+
+            // Change color based on temperature
+            if (value > 60) {
+                this.gauge.setColor('#EF4444'); // Red - hot
+            } else if (value > 45) {
+                this.gauge.setColor('#FF864A'); // Orange - warm
+            } else {
+                this.gauge.setColor('#10B981'); // Green - normal
+            }
+        }
+    }
+
     subscribeToStore() {
         this.unsubscribe = store.subscribe('sensorData', (data) => {
             if (data && data.temp !== undefined) {

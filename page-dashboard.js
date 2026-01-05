@@ -139,38 +139,29 @@ export default {
   },
 
   subscribeToData() {
-    const unsubscribe = store.subscribe('sensorData', (data) => {
-      if (!data) return;
+    this.unsubscribers.push(
+      store.subscribe('sensorData', (data) => {
+        if (!data) return;
 
-      // Update Uptime
-      if (data.uptime !== undefined) {
+        // 1. Update Uptime
         const uptimeDisplay = document.getElementById('uptime-display');
-        if (uptimeDisplay) uptimeDisplay.textContent = `Uptime: ${formatUptime(data.uptime)}`;
-      }
+        if (uptimeDisplay && data.uptime !== undefined) {
+          uptimeDisplay.textContent = `Uptime: ${formatUptime(data.uptime)}`;
+        }
 
-      // Update Widgets
-      // Map flat data structure from ESP32 to widgets
+        // 2. Update Widgets (Mapping fields from ESP32 JSON)
+        if (this.widgets.length >= 3) {
+          // Touch Pins Widget (data.touch)
+          if (data.touch !== undefined) this.widgets[0].update(data.touch);
 
-      // 1. Touch Widget
-      const touchWidget = this.widgets[0];
-      if (touchWidget && data.touch !== undefined) {
-        touchWidget.update(data.touch);
-      }
+          // Hall Sensor Widget (data.hall)
+          if (data.hall !== undefined) this.widgets[1].update(data.hall);
 
-      // 2. Hall Widget
-      const hallWidget = this.widgets[1];
-      if (hallWidget && data.hall !== undefined) {
-        hallWidget.update(data.hall);
-      }
-
-      // 3. Temp Widget
-      const tempWidget = this.widgets[2];
-      if (tempWidget && data.temp !== undefined) {
-        tempWidget.update(data.temp);
-      }
-    });
-
-    this.unsubscribers.push(unsubscribe);
+          // Temperature Widget (data.temp)
+          if (data.temp !== undefined) this.widgets[2].update(data.temp);
+        }
+      })
+    );
   },
 
   cleanup() {

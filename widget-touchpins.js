@@ -101,7 +101,18 @@ export default class TouchPinsWidget {
     });
   }
 
+  update(value) {
+    this.updatePins(value);
+  }
+
   updatePins(touchData) {
+    // Convert single number to array format (T4 is at index 4)
+    if (typeof touchData === 'number') {
+      const pins = Array(10).fill(0);
+      pins[4] = touchData;
+      touchData = pins;
+    }
+
     if (!Array.isArray(touchData)) return;
 
     touchData.forEach((value, index) => {
