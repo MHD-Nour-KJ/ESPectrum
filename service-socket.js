@@ -55,15 +55,12 @@ class MQTTService {
 
         // Subscribe to data topic
         this.client.subscribe(this.topicData, (err) => {
-            if (!err) {
-                console.log(`[MQTT] Subscribed to ${this.topicData}`);
-            }
+                if (!err) console.log(`[MQTT] Subscribed to ${this.topicData}`);
         });
 
-        store.dispatch('WS_CONNECTED', {
-            connected: true,
-            mockMode: false,
-            systemStatus: 'connected'
+        // Subscribe to telemetry topic
+        this.client.subscribe(this.topicTelemetry, (err) => {
+            if (!err) console.log(`[MQTT] Subscribed to ${this.topicTelemetry}`);
         });
     }
 
@@ -239,4 +236,5 @@ class MQTTService {
 const mqttService = new MQTTService();
 window.wsService = mqttService; // Keep global name compatible
 export default mqttService;
+
 
