@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="ESPectrum - Unleashing the ESP32's power through stunning real-time visualizations">
+    <meta name="theme-color" content="#684AFF">
+    <title>ESPectrum | Hacker Board</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+        rel="stylesheet">
+
+    <!-- Phosphor Icons -->
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.0.3/src/regular/style.css">
+
+    <!-- Global Error Logger (Debug) -->
+    <script>
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.top = '0';
+            container.style.left = '0';
+            container.style.width = '100%';
+            container.style.backgroundColor = '#EF4444';
+            container.style.color = 'white';
+            container.style.padding = '1rem';
+            container.style.zIndex = '10000';
+            container.style.fontFamily = 'monospace';
+            container.style.borderBottom = '1px solid rgba(255,255,255,0.2)';
+
+            const message = [
+                '🚨 Application Error:',
+                msg,
+                'File: ' + (url ? url.split('/').pop() : 'unknown'),
+                'Line: ' + lineNo,
+            ].join('\n');
+
+            container.innerHTML = '<pre style="margin:0; white-space:pre-wrap;">' + message + '</pre>';
+            document.body.appendChild(container);
+            return false;
+        };
+
+        // Catch unhandled promise rejections
+        window.onunhandledrejection = function (event) {
+            window.onerror('Unhandled Promise Rejection: ' + event.reason, null, 0, 0, event.reason);
+        };
+    </script>
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="styles-global.css">
+    <link rel="stylesheet" href="styles-animations.css">
+    <link rel="stylesheet" href="styles-responsive.css">
+</head>
+
+<body>
+    <!-- Animated Background -->
+    <canvas id="background-canvas"></canvas>
+
+    <!-- App Container -->
+    <div id="app">
+        <!-- Header (will be injected by ui-header.js) -->
+        <header id="app-header"></header>
+
+        <!-- Navigation Drawer (will be injected by ui-drawer.js) -->
+        <nav id="app-drawer"></nav>
+
+        <!-- Main Content Area (pages render here) -->
+        <main id="app-content" class="content-container">
+            <!-- Pages will be dynamically loaded here -->
+        </main>
+        <div id="app-footer"></div>
+    </div>
+
+    <!-- CDN Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+    <!-- File Protocol Warning Overlay -->
+    <div id="file-protocol-warning"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0F0C29; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem;">
+        <h1 style="color: #EF4444; font-family: sans-serif; margin-bottom: 1rem;">⚠️ Browser Security Restriction</h1>
+        <p style="color: white; font-family: sans-serif; font-size: 1.25rem; max-width: 600px; line-height: 1.6;">
+            Modern browsers block <strong>ES6 Modules</strong> when opening files directly from your computer
+            (<code>file://</code> protocol).
+        </p>
+        <div
+            style="background: rgba(255,255,255,0.1); padding: 1.5rem; border-radius: 12px; margin: 2rem 0; text-align: left;">
+            <p style="color: #FFE14A; font-family: monospace; margin: 0 0 1rem;">To fix this, you must use a local
+                server:</p>
+            <ol style="color: #E2E8F0; font-family: sans-serif; margin: 0; padding-left: 1.5rem; line-height: 1.8;">
+                <li>Open terminal in this folder</li>
+                <li>Run: <code
+                        style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">python -m http.server</code>
+                </li>
+                <li>Go to: <a href="http://localhost:8000" style="color: #684AFF;">http://localhost:8000</a></li>
+            </ol>
+        </div>
+        <button onclick="location.reload()"
+            style="background: #684AFF; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer;">Reload
+            Page</button>
+    </div>
+
+    <script>
+        // Check if running via file protocol
+        if (window.location.protocol === 'file:') {
+            document.getElementById('file-protocol-warning').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            throw new Error('ES6 Modules cannot run via file:// protocol. Please use a local server.');
+        }
+    </script>
+
+    <!-- Main Application (ES6 Module) -->
+    <script type="module" src="app-main.js"></script>
+</body>
+
+</html>
