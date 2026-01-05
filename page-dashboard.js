@@ -12,11 +12,11 @@ import store from './app-store.js';
 import { formatUptime } from './utils-helpers.js';
 
 export default {
-    widgets: [],
-    unsubscribers: [],
+  widgets: [],
+  unsubscribers: [],
 
-    async render(container) {
-        container.innerHTML = `
+  async render(container) {
+    container.innerHTML = `
       <div class="dashboard-page">
         <!-- Page Header -->
         <div class="dashboard-header" style="margin-bottom: var(--spacing-lg);">
@@ -102,64 +102,86 @@ export default {
       </div>
     `;
 
-        // Initialize widgets
-        this.initializeWidgets(container);
+    // Initialize widgets
+    this.initializeWidgets(container);
 
-        // Subscribe to uptime updates
-        this.subscribeToUptime();
+    // Subscribe to uptime updates
+    this.subscribeToUptime();
 
-        // Cleanup function
-        return () => this.cleanup();
-    },
+    // Cleanup function
+    return () => this.cleanup();
+  },
 
-    initializeWidgets(container) {
-        // Touch Pins Widget
-        const touchContainer = container.querySelector('#touch-widget');
-        const touchWidget = new TouchPinsWidget(touchContainer);
-        touchWidget.render();
-        this.widgets.push(touchWidget);
+  initializeWidgets(container) {
+    // Touch Pins Widget
+    const touchContainer = container.querySelector('#touch-widget');
+    const touchWidget = new TouchPinsWidget(touchContainer);
+    touchWidget.render();
+    this.widgets.push(touchWidget);
 
-        // Hall Sensor Widget
-        const hallContainer = container.querySelector('#hall-widget');
-        const hallWidget = new HallSensorWidget(hallContainer);
-        hallWidget.render();
-        this.widgets.push(hallWidget);
+    // Hall Sensor Widget
+    const hallContainer = container.querySelector('#hall-widget');
+    const hallWidget = new HallSensorWidget(hallContainer);
+    hallWidget.render();
+    this.widgets.push(hallWidget);
 
-        // Temperature Widget
-        const tempContainer = container.querySelector('#temp-widget');
-        const tempWidget = new TemperatureWidget(tempContainer);
-        tempWidget.render();
-        this.widgets.push(tempWidget);
+    // Temperature Widget
+    const tempContainer = container.querySelector('#temp-widget');
+    const tempWidget = new TemperatureWidget(tempContainer);
+    tempWidget.render();
+    this.widgets.push(tempWidget);
 
-        // Deep Sleep Widget
-        const sleepContainer = container.querySelector('#sleep-widget');
-        const sleepWidget = new DeepSleepWidget(sleepContainer);
-        sleepWidget.render();
-        this.widgets.push(sleepWidget);
-    },
+    // Deep Sleep Widget
+    const sleepContainer = container.querySelector('#sleep-widget');
+    const sleepWidget = new DeepSleepWidget(sleepContainer);
+    sleepWidget.render();
+    this.widgets.push(sleepWidget);
+  },
 
-    subscribeToUptime() {
-        const unsubscribe = store.subscribe('sensorData', (data) => {
-            if (data && data.uptime !== undefined) {
-                const uptimeDisplay = document.getElementById('uptime-display');
-                if (uptimeDisplay) {
-                    uptimeDisplay.textContent = `Uptime: ${formatUptime(data.uptime)}`;
-                }
-            }
-        });
+  subscribeToData() {
+    const unsubscribe = store.subscribe('sensorData', (data) => {
+      if (!data) return;
 
-        this.unsubscribers.push(unsubscribe);
-    },
+      // Update Uptime
+      if (data.uptime !== undefined) {
+        const uptimeDisplay = document.getElementById('uptime-display');
+        if (uptimeDisplay) uptimeDisplay.textContent = `Uptime: ${formatUptime(data.uptime)}`;
+      }
 
-    cleanup() {
-        // Cleanup all widgets
-        this.widgets.forEach(widget => {
-            if (widget.cleanup) widget.cleanup();
-        });
-        this.widgets = [];
+      // Update Widgets
+      // Map flat data structure from ESP32 to widgets
 
-        // Unsubscribe from store
-        this.unsubscribers.forEach(unsub => unsub());
-        this.unsubscribers = [];
-    }
+      // 1. Touch Widget
+      const touchWidget = this.widgets[0];
+      if (touchWidget && data.touch !== undefined) {
+        touchWidget.update(data.touch);
+      }
+
+      // 2. Hall Widget
+      const hallWidget = this.widgets[1];
+      if (hallWidget && data.hall !== undefined) {
+        hallWidget.update(data.hall);
+      }
+
+      // 3. Temp Widget
+      const tempWidget = this.widgets[2];
+      if (tempWidget && data.temp !== undefined) {
+        tempWidget.update(data.temp);
+      }
+    });
+
+    this.unsubscribers.push(unsubscribe);
+  },
+
+  cleanup() {
+    // Cleanup all widgets
+    this.widgets.forEach(widget => {
+      if (widget.cleanup) widget.cleanup();
+    });
+    this.widgets = [];
+
+    // Unsubscribe from store
+    this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers = [];
+  }
 };

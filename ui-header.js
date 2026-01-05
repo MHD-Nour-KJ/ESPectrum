@@ -196,7 +196,7 @@ export default class Header {
           action: 'toggle_led',
           params: { state: isLedOn }
         };
-        window.wsService.send(JSON.stringify(command));
+        window.wsService.send(command);
         console.log('[Header] Sent LED command:', command);
       }
     });
