@@ -16,6 +16,9 @@ export default {
   unsubscribers: [],
 
   async render(container) {
+    // Clear previous state
+    this.cleanup();
+
     container.innerHTML = `
       <div class="dashboard-page">
         <!-- Page Header -->
@@ -34,6 +37,10 @@ export default {
               <div class="badge">
                 <i class="ph ph-clock"></i>
                 <span id="uptime-display">Uptime: --</span>
+              </div>
+              <div class="badge">
+                <i class="ph ph-broadcast"></i>
+                <span id="rssi-display">RSSI: --</span>
               </div>
             </div>
           </div>
@@ -143,21 +150,27 @@ export default {
       store.subscribe('sensorData', (data) => {
         if (!data) return;
 
-        // 1. Update Uptime
+        // 1. Update Uptime & RSSI
         const uptimeDisplay = document.getElementById('uptime-display');
         if (uptimeDisplay && data.uptime !== undefined) {
           uptimeDisplay.textContent = `Uptime: ${formatUptime(data.uptime)}`;
         }
 
+        const rssiDisplay = document.getElementById('rssi-display');
+        if (rssiDisplay && data.rssi !== undefined) {
+          rssiDisplay.textContent = `RSSI: ${data.rssi} dBm`;
+        }
+
         // 2. Update Widgets (Mapping fields from ESP32 JSON)
+        // Widgets are stored in order: [Touch, Hall, Temp, Sleep]
         if (this.widgets.length >= 3) {
-          // Touch Pins Widget (data.touch)
+          // Touch Pins (data.touch)
           if (data.touch !== undefined) this.widgets[0].update(data.touch);
 
-          // Hall Sensor Widget (data.hall)
+          // Hall Sensor (data.hall)
           if (data.hall !== undefined) this.widgets[1].update(data.hall);
 
-          // Temperature Widget (data.temp)
+          // Temperature (data.temp)
           if (data.temp !== undefined) this.widgets[2].update(data.temp);
         }
       })

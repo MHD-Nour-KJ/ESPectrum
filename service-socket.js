@@ -12,7 +12,6 @@ class MQTTService {
         this.clientId = 'espectrum-web-' + Math.random().toString(16).substr(2, 8);
         this.topicData = 'espectrum/data';
         this.topicTelemetry = 'espectrum/telemetry';
-        this.topicTelemetry = 'espectrum/telemetry';
         this.topicChat = 'espectrum/chat';
         this.topicCommand = 'espectrum/command';
 

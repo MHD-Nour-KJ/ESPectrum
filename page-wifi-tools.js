@@ -238,11 +238,14 @@ export default class PageWifiTools {
     `;
 
     // Logic for Sonar
-    this.unsubscribe = store.subscribe('telemetry', (data) => {
-      // Assuming telemetry will eventually have 'rssi'. 
-      // For now, use a simulated jitter if not present.
-      const rssi = data.rssi || (data.scan_rssi) || -65 + (Math.random() * 5 - 2.5);
-      this.updateSonar(rssi);
+    this.unsubscribe = store.subscribe('sensorData', (data) => {
+      if (data && data.rssi !== undefined) {
+        this.updateSonar(data.rssi);
+      } else {
+        // Fallback jitter if no real RSSI yet
+        const mockRssi = -65 + (Math.random() * 5 - 2.5);
+        this.updateSonar(mockRssi);
+      }
     });
   }
 

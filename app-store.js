@@ -16,6 +16,7 @@ class Store {
                 touch: Array(10).fill(0),
                 hall: 0,
                 temp: 0,
+                rssi: -100,
                 uptime: 0
             },
 
