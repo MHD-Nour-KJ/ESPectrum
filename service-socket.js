@@ -18,13 +18,28 @@ class MQTTService {
         // Mock mode for fallback
         this.mockMode = false;
         this.mockInterval = null;
+
+        // Connection handling
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.isExplicitlyDisconnected = false;
+        this.watchdogInterval = null;
     }
 
     /**
      * Initialize connection
      */
     async connect() {
-        store.dispatch('WS_CONNECTING', { systemStatus: 'connecting' });
+        if (this.client && this.client.connected) return;
+
+        this.startWatchdog();
+
+        this.isExplicitlyDisconnected = false;
+        store.dispatch('WS_STATUS_CHANGE', {
+            systemStatus: 'connecting',
+            connected: false,
+            mockMode: false
+        });
         console.log('[MQTT] Connecting to Flespi...');
 
         try {
@@ -33,7 +48,8 @@ class MQTTService {
                 username: this.token,
                 clientId: this.clientId,
                 clean: true,
-                keepalive: 60
+                keepalive: 60,
+                reconnectPeriod: 0 // We handle reconnection manually for better UI control
             });
 
             this.client.on('connect', () => this.onConnect());
@@ -44,8 +60,16 @@ class MQTTService {
 
         } catch (err) {
             console.error('[MQTT] Init failed:', err);
-            this.enableMockMode();
+            this.handleConnectionFailure(err);
         }
+    }
+
+    /**
+     * Manual Retry from UI
+     */
+    retry() {
+        this.disconnect();
+        setTimeout(() => this.connect(), 500);
     }
 
     /**
@@ -54,20 +78,12 @@ class MQTTService {
     onConnect() {
         console.log('[MQTT] Connected!');
         this.mockMode = false;
+        this.reconnectAttempts = 0;
 
-        // Subscribe to data topic
-        this.client.subscribe(this.topicData, (err) => {
-            if (!err) console.log(`[MQTT] Subscribed to ${this.topicData}`);
-        });
-
-        // Subscribe to telemetry topic
-        this.client.subscribe(this.topicTelemetry, (err) => {
-            if (!err) console.log(`[MQTT] Subscribed to ${this.topicTelemetry}`);
-        });
-
-        // Subscribe to chat topic
-        this.client.subscribe(this.topicChat, (err) => {
-            if (!err) console.log(`[MQTT] Subscribed to ${this.topicChat}`);
+        // Subscribe to topics
+        const topics = [this.topicData, this.topicTelemetry, this.topicChat];
+        this.client.subscribe(topics, (err) => {
+            if (!err) console.log(`[MQTT] Subscribed to ${topics.join(', ')}`);
         });
 
         store.dispatch('WS_CONNECTED', {
@@ -111,6 +127,12 @@ class MQTTService {
      * Handle business logic for incoming messages
      */
     handleDataMessage(message) {
+        // Update Heartbeat on ANY message from ESP32
+        store.dispatch('HARDWARE_HEARTBEAT', {
+            hardwareConnected: true,
+            lastHeartbeat: Date.now()
+        });
+
         // Sensor Data
         if (message.type === 'sensor_data') {
             // Unify structure: Hardware is flat, Mock has .data
@@ -148,24 +170,75 @@ class MQTTService {
      */
     onError(error) {
         console.error('[MQTT] Error:', error);
-        store.dispatch('WS_ERROR', { systemStatus: 'error' });
+        // Don't dispatch error status immediately, wait for close/offline
     }
 
     /**
      * Connection Lost
      */
     onOffline() {
+        if (this.isExplicitlyDisconnected) return;
+
         console.warn('[MQTT] Offline');
-        store.dispatch('WS_DISCONNECTED', {
+        store.dispatch('WS_STATUS_CHANGE', {
             connected: false,
             systemStatus: 'disconnected'
         });
+
+        // Attempt reconnect if not explicitly closed
+        this.attemptReconnect();
+    }
+
+    /**
+     * Connection Closed
+     */
+    onClose() {
+        console.log('[MQTT] Closed');
+        if (!this.isExplicitlyDisconnected) {
+            this.attemptReconnect();
+        }
+    }
+
+    /**
+     * Handle Reconnection Logic
+     */
+    attemptReconnect() {
+        if (this.client && this.client.connected) return;
+        if (this.mockMode) return;
+
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            const delay = this.reconnectAttempts * 1000;
+
+            console.log(`[MQTT] Reconnecting attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms...`);
+
+            store.dispatch('WS_STATUS_CHANGE', {
+                systemStatus: 'retrying',
+                connectionAttempts: this.reconnectAttempts
+            });
+
+            setTimeout(() => {
+                if (!this.client || !this.client.connected) {
+                    this.client?.reconnect(); // Trigger mqtt.js reconnect
+                }
+            }, delay);
+        } else {
+            console.warn('[MQTT] Max reconnect attempts reached. Switching to Mock Mode.');
+            this.enableMockMode();
+            store.dispatch('WS_STATUS_CHANGE', { systemStatus: 'failed' });
+        }
+    }
+
+    handleConnectionFailure(err) {
+        store.dispatch('WS_STATUS_CHANGE', { systemStatus: 'failed' });
+        this.enableMockMode();
     }
 
     /**
      * Disconnect
      */
     disconnect() {
+        this.isExplicitlyDisconnected = true;
         if (this.client) {
             this.client.end();
             this.client = null;
@@ -177,14 +250,6 @@ class MQTTService {
             connected: false,
             systemStatus: 'disconnected'
         });
-    }
-
-    /**
-     * Connection Closed
-     */
-    onClose() {
-        console.log('[MQTT] Closed');
-        // Auto-reconnect is handled by mqtt.js, but we update UI
     }
 
     /**
@@ -207,6 +272,7 @@ class MQTTService {
             }
         } else {
             console.warn('[MQTT] Cannot send, not connected');
+            // If in mock mode, simulate logic could go here if needed
         }
     }
 
@@ -239,6 +305,24 @@ class MQTTService {
             this.mockInterval = null;
         }
         this.mockMode = false;
+    }
+
+    startWatchdog() {
+        if (this.watchdogInterval) clearInterval(this.watchdogInterval);
+
+        this.watchdogInterval = setInterval(() => {
+            const state = store.getState();
+            if (state.mockMode) return;
+
+            const now = Date.now();
+            const timeSinceLastSeen = now - state.lastHeartbeat;
+
+            // If No message for 5 seconds, mark hardware as offline
+            if (state.hardwareConnected && timeSinceLastSeen > 5000) {
+                console.warn('[Watchdog] ESP32 Heartbeat lost.');
+                store.dispatch('HARDWARE_OFFLINE', { hardwareConnected: false });
+            }
+        }, 1000);
     }
 
     generateMockData() {

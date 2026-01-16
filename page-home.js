@@ -6,8 +6,8 @@
 import { hapticFeedback } from './utils-helpers.js';
 
 export default {
-  async render(container) {
-    container.innerHTML = `
+   async render(container) {
+      container.innerHTML = `
       <div class="home-page">
         
         <!-- 1. HERO SECTION: The Mission -->
@@ -119,6 +119,13 @@ export default {
                      <p>IR Blaster</p>
                    </div>
                 </a>
+                <a href="#/ble-hid" class="dashboard-card glass-card">
+                   <i class="ph ph-keyboard card-icon"></i>
+                   <div class="card-info">
+                     <h3>Ghost Keyboard</h3>
+                     <p>HID Injection</p>
+                   </div>
+                </a>
             </div>
         </section>
 
@@ -153,13 +160,6 @@ export default {
                      <p>BLE Spammer</p>
                    </div>
                 </a>
-                <a href="#/ble-hid" class="dashboard-card glass-card hack-card">
-                   <i class="ph ph-keyboard card-icon text-danger"></i>
-                   <div class="card-info">
-                     <h3>Ghost Keyboard</h3>
-                     <p>HID Injection</p>
-                   </div>
-                </a>
                  <a href="#/defense" class="dashboard-card glass-card defense-card">
                    <i class="ph ph-shield-check card-icon" style="color: #22c55e;"></i>
                    <div class="card-info">
@@ -173,17 +173,17 @@ export default {
       </div>
     `;
 
-    this.addStyles();
+      this.addStyles();
 
-    // Cleanup
-    return () => { };
-  },
+      // Cleanup
+      return () => { };
+   },
 
-  addStyles() {
-    if (document.getElementById('home-v2-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'home-v2-styles';
-    style.textContent = `
+   addStyles() {
+      if (document.getElementById('home-v2-styles')) return;
+      const style = document.createElement('style');
+      style.id = 'home-v2-styles';
+      style.textContent = `
       .hero-section {
          padding: 4rem 1rem;
          background: radial-gradient(circle at top, rgba(104, 74, 255, 0.15), transparent 70%);
@@ -234,6 +234,6 @@ export default {
       .card-info h3 { font-size: 1rem; margin: 0; color: white; }
       .card-info p { font-size: 0.8rem; margin: 0; opacity: 0.7; }
     `;
-    document.head.appendChild(style);
-  }
+      document.head.appendChild(style);
+   }
 };

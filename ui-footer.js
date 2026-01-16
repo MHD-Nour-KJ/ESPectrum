@@ -30,7 +30,7 @@ export default class Footer {
                 </a>
 
                 <!-- Instagram -->
-                <a href="https://www.instagram.com/mhd_nour_kj?igsh=bHFlZjVnZHMzZnpz" class="social-btn" title="Instagram" target="_blank">
+                <a href="https://www.instagram.com/mhdnourkj/" class="social-btn" title="Instagram" target="_blank">
                     <i class="ph ph-instagram-logo"></i>
                 </a>
 

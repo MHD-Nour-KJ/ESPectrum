@@ -10,6 +10,7 @@ import AnimatedBackground from './ui-background.js';
 import Header from './ui-header.js';
 import Drawer from './ui-drawer.js';
 import Footer from './ui-footer.js';
+import HelpSystem from './ui-help.js';
 
 // Import pages
 import pageHome from './page-home.js';
@@ -45,6 +46,9 @@ class App {
 
         // 4. Initialize footer
         this.initFooter();
+
+        // 5. Initialize Help System
+        new HelpSystem();
 
         // 5. Register routes
         await this.registerRoutes();

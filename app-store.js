@@ -9,6 +9,8 @@ class Store {
             // Connection status
             connected: false,
             mockMode: false,
+            hardwareConnected: false,
+            lastHeartbeat: 0,
             connectionAttempts: 0,
 
             // Sensor data
@@ -74,6 +76,8 @@ class Store {
         // Apply updates
         if (action === 'CHAT_MESSAGE_RECEIVED') {
             updates = { lastMessage: updates };
+        } else if (action === 'WS_STATUS_CHANGE' || action === 'HARDWARE_HEARTBEAT' || action === 'HARDWARE_OFFLINE') {
+            // Already correctly shaped, fall through
         }
 
         this.state = this._deepMerge(this.state, updates);

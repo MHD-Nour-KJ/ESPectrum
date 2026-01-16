@@ -22,7 +22,8 @@ export default class Header {
           </div>
           
           <div class="header-center">
-            <div id="connection-status"></div>
+            <div id="mqtt-status" class="status-container"></div>
+            <div id="hw-status" class="status-container"></div>
           </div>
           
           <div class="header-right">
@@ -30,10 +31,6 @@ export default class Header {
             <button class="btn btn-led" id="led-btn" aria-label="Toggle LED" title="Toggle ESP32 LED">
               <i class="ph ph-lightbulb"></i>
               <span class="led-text">ESP LED</span>
-            </button>
-            
-            <button class="btn btn-icon" id="refresh-btn" aria-label="Refresh connection" title="Refresh Connection">
-              <i class="ph ph-arrow-clockwise"></i>
             </button>
           </div>
         </div>
@@ -101,6 +98,8 @@ export default class Header {
         left: 50%;
         transform: translateX(-50%);
         display: flex;
+        align-items: center;
+        gap: 8px;
         justify-content: center;
       }
       
@@ -158,6 +157,74 @@ export default class Header {
           border-radius: 8px;
         }
       }
+      /* Connection Status Styles */
+      .status-connecting {
+        background: rgba(234, 179, 8, 0.15);
+        color: #fbbf24;
+        border: 1px solid rgba(234, 179, 8, 0.3);
+      }
+      
+      .status-warning {
+        background: rgba(234, 179, 8, 0.15);
+        color: #fbbf24;
+        border: 1px solid rgba(234, 179, 8, 0.3);
+      }
+      
+      .status-error {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+      }
+      
+      .status-connected {
+        background: rgba(34, 197, 94, 0.15);
+        color: #4ade80;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+      }
+      
+      .status-mock {
+        background: rgba(168, 85, 247, 0.15);
+        color: #c084fc;
+        border: 1px solid rgba(168, 85, 247, 0.3);
+      }
+      
+      .status-container {
+        cursor: pointer;
+      }
+
+      .badge {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 99px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        cursor: pointer; /* Ensure entire badge shows pointer */
+      }
+
+      .badge:hover {
+        transform: scale(1.05);
+        filter: brightness(1.2);
+      }
+      
+      .badge:active {
+        transform: scale(0.95);
+      }
+      
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      
+      .spin-icon {
+        animation: spin 1.5s linear infinite;
+      }
+      
+      .spin {
+        animation: spin 1s linear infinite;
+      }
     `;
 
     document.head.appendChild(style);
@@ -178,41 +245,25 @@ export default class Header {
 
     ledBtn?.addEventListener('click', () => {
       isLedOn = !isLedOn;
-
-      // Update UI
       if (isLedOn) {
         ledBtn.classList.add('active');
-        // Change icon style to filled if library supports it, otherwise just glow
         ledBtn.querySelector('i').classList.replace('ph-lightbulb', 'ph-lightbulb-filament');
       } else {
         ledBtn.classList.remove('active');
         ledBtn.querySelector('i').classList.replace('ph-lightbulb-filament', 'ph-lightbulb');
       }
-
-      // Send MQTT Command
       if (window.wsService) {
-        const command = {
-          type: 'command',
-          action: 'toggle_led',
-          params: { state: isLedOn }
-        };
-        window.wsService.send(command);
-        console.log('[Header] Sent LED command:', command);
+        window.wsService.send({ type: 'command', action: 'toggle_led', params: { state: isLedOn } });
       }
     });
 
-    // Refresh button
-    const refreshBtn = document.getElementById('refresh-btn');
-    refreshBtn?.addEventListener('click', () => {
-      if (window.wsService) {
-        window.wsService.disconnect();
-        setTimeout(() => window.wsService.connect(), 500);
-      }
+    // Clicking status badges refreshes connection
+    const handleStatusClick = () => {
+      if (window.wsService) window.wsService.retry();
+    };
 
-      // Animate button
-      refreshBtn.classList.add('spin');
-      setTimeout(() => refreshBtn.classList.remove('spin'), 1000);
-    });
+    document.getElementById('mqtt-status')?.addEventListener('click', handleStatusClick);
+    document.getElementById('hw-status')?.addEventListener('click', handleStatusClick);
   }
 
   subscribeToStore() {
@@ -224,47 +275,88 @@ export default class Header {
   initSmartScroll() {
     let lastScroll = 0;
     const header = document.getElementById('header-wrapper');
-
     window.addEventListener('scroll', () => {
       if (!header) return;
-
       const currentScroll = window.scrollY;
-
-      // Down scroll & not at top
       if (currentScroll > lastScroll && currentScroll > 50) {
         header.classList.add('header-hidden');
       } else {
-        // Up scroll
         header.classList.remove('header-hidden');
       }
-
       lastScroll = currentScroll;
     });
   }
 
   updateConnectionStatus() {
-    const statusContainer = document.getElementById('connection-status');
-    if (!statusContainer) return;
+    const mqttContainer = document.getElementById('mqtt-status');
+    const hwContainer = document.getElementById('hw-status');
+    if (!mqttContainer || !hwContainer) return;
 
     const state = store.getState();
-    let statusClass = 'status-disconnected';
-    let statusText = 'Disconnected';
-    let icon = 'ph-wifi-slash';
 
-    if (state.mockMode) {
-      statusClass = 'status-mock';
-      statusText = 'Mock Mode';
-      icon = 'ph-test-tube';
-    } else if (state.connected) {
-      statusClass = 'status-connected';
-      statusText = 'Connected';
-      icon = 'ph-wifi-high';
+    // 1. MQTT Cloud Status
+    let mClass = 'status-disconnected';
+    let mText = 'Cloud: Off';
+    let mIcon = 'ph-cloud-slash';
+
+    switch (state.systemStatus) {
+      case 'connecting':
+        mClass = 'status-connecting';
+        mText = 'Cloud: Seq...';
+        mIcon = 'ph-arrows-clockwise';
+        break;
+      case 'retrying':
+        mClass = 'status-warning';
+        mText = `Cloud: Try ${state.connectionAttempts}`;
+        mIcon = 'ph-arrows-clockwise';
+        break;
+      case 'connected':
+        mClass = 'status-connected';
+        mText = 'Cloud: Online';
+        mIcon = 'ph-cloud-check';
+        break;
+      case 'failed':
+        mClass = 'status-error';
+        mText = 'Cloud: Fail';
+        mIcon = 'ph-cloud-warning';
+        break;
+      case 'mock':
+        mClass = 'status-mock';
+        mText = 'Cloud: Mock';
+        mIcon = 'ph-test-tube';
+        break;
     }
 
-    statusContainer.innerHTML = `
-      <div class="badge ${statusClass}">
-        <i class="ph ${icon}"></i>
-        ${statusText}
+    mqttContainer.innerHTML = `
+      <div class="badge ${mClass}" title="MQTT Broker Status - Click to Refresh">
+        <i class="ph ${mIcon} ${state.systemStatus === 'connecting' || state.systemStatus === 'retrying' ? 'spin-icon' : ''}"></i>
+        ${mText}
+      </div>
+    `;
+
+    // 2. Hardware / ESP32 Status
+    let hClass = 'status-disconnected';
+    let hText = 'ESP32: Off';
+    let hIcon = 'ph-plugs-off';
+
+    if (state.mockMode) {
+      hClass = 'status-mock';
+      hText = 'ESP32: Mock';
+      hIcon = 'ph-cpu';
+    } else if (state.hardwareConnected && state.systemStatus === 'connected') {
+      hClass = 'status-connected';
+      hText = 'ESP32: Live';
+      hIcon = 'ph-cpu';
+    } else if (state.systemStatus === 'connected') {
+      hClass = 'status-warning';
+      hText = 'ESP32: Lost';
+      hIcon = 'ph-plugs-off';
+    }
+
+    hwContainer.innerHTML = `
+      <div class="badge ${hClass}" title="ESP32 Hardware Status - Click to Refresh">
+        <i class="ph ${hIcon}"></i>
+        ${hText}
       </div>
     `;
   }
