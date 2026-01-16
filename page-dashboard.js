@@ -9,7 +9,7 @@ import HallSensorWidget from './widget-hallsensor.js';
 import TemperatureWidget from './widget-temperature.js';
 import DeepSleepWidget from './widget-sleep.js';
 import store from './app-store.js';
-import { formatUptime } from './utils-helpers.js';
+import { formatUptime, copyToClipboard } from './utils-helpers.js';
 
 export default {
   widgets: [],

@@ -41,9 +41,37 @@ export default class PageWifiTools {
       this.updateScannerUI();
     } else if (route === '/wifi-sonar') {
       this.updateSonarUI();
+    } else if (route === '/wifi-traffic') {
+      this.updateTrafficUI();
     } else if (route === '/defense') {
       this.updateDefenseUI();
     }
+  }
+
+  // ... (Scanner code)
+
+  updateTrafficUI() {
+    const history = store.getState().packetHistory || [];
+    const log = document.getElementById('traffic-log');
+    const countEl = document.getElementById('pkt-count');
+    if (!log) return;
+
+    if (!Array.isArray(history) || history.length === 0) {
+      log.innerHTML = '<div class="text-tertiary">> Awaiting capture command...</div>';
+      if (countEl) countEl.textContent = '0 Packets';
+      return;
+    }
+
+    log.innerHTML = history.map(pkt => `
+      <div style="border-bottom: 1px solid #111; padding: 2px 0;">
+        <span style="color: #777;">[${new Date().toLocaleTimeString()}]</span> 
+        <span style="color: #3b82f6;">${pkt.type}</span> 
+        FROM:${pkt.from || '??:??:??'} -> TO:${pkt.to || '??:??:??'} 
+        <span style="color: #facc15;">RSSI:${pkt.rssi}</span>
+      </div>
+    `).join('');
+
+    if (countEl) countEl.textContent = `${history.length} Packets (Last 100)`;
   }
 
   // ==================== 1. WIFI SCANNER (RADAR) ====================
@@ -304,33 +332,6 @@ export default class PageWifiTools {
         mqtt.send({ type: 'command', action: 'stop_sniffing' });
       }
     });
-
-    // Simulation/Placeholder for packets till real logic in service-socket
-    this.unsubscribe = store.subscribe('lastMessage', (msg) => {
-      if (msg && msg.type === 'packet_data') {
-        this.addPacketRow(msg.data);
-      }
-    });
-  }
-
-  addPacketRow(data) {
-    const log = document.getElementById('traffic-log');
-    const countEl = document.getElementById('pkt-count');
-    if (!log) return;
-
-    const row = document.createElement('div');
-    row.style.borderBottom = '1px solid #111';
-    row.style.padding = '2px 0';
-    row.innerHTML = `<span style="color: #777;">[${new Date().toLocaleTimeString()}]</span> 
-                       <span style="color: #3b82f6;">${data.type}</span> 
-                       FROM:${data.from} -> TO:${data.to} 
-                       <span style="color: #facc15;">RSSI:${data.rssi}</span>`;
-
-    log.prepend(row);
-    if (log.childNodes.length > 50) log.lastChild.remove();
-
-    const count = parseInt(countEl.textContent) || 0;
-    countEl.textContent = `${count + 1} Packets`;
   }
 
 

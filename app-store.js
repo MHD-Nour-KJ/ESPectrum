@@ -49,6 +49,7 @@ class Store {
             wifiNetworks: [],
             bleDevices: [],
             trafficData: [],
+            packetHistory: [],
             attackLogs: [],
             chatMessages: []
         };
@@ -83,16 +84,33 @@ class Store {
     /**
      * Dispatch state changes
      * @param {string} action - Action type (for debugging)
-     * @param {Object} updates - State updates to apply
+     * @param {Object} payload - State updates or specific action payload
      */
-    dispatch(action, updates) {
+    dispatch(action, payload) {
         const prevState = { ...this.state };
+        let updates = {};
 
-        // Apply updates
-        if (action === 'CHAT_MESSAGE_RECEIVED') {
-            updates = { lastMessage: updates };
-        } else if (action === 'WS_STATUS_CHANGE' || action === 'HARDWARE_HEARTBEAT' || action === 'HARDWARE_OFFLINE') {
-            // Already correctly shaped, fall through
+        switch (action) {
+            case 'RECORD_MESSAGE':
+                updates = { lastMessage: payload.message };
+                break;
+            case 'PACKET_RECEIVED':
+                const newPackets = [payload.packet, ...this.state.packetHistory].slice(0, 100);
+                updates = { packetHistory: newPackets };
+                break;
+            case 'CHAT_MESSAGE_RECEIVED':
+                updates = { chatMessages: payload.chatMessages };
+                break;
+            case 'WS_STATUS_CHANGE':
+            case 'HARDWARE_HEARTBEAT':
+            case 'HARDWARE_OFFLINE':
+                // These actions are expected to have payload directly as updates
+                updates = payload;
+                break;
+            default:
+                // For all other actions, assume payload is the updates object
+                updates = payload;
+                break;
         }
 
         this.state = this._deepMerge(this.state, updates);

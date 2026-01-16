@@ -101,6 +101,9 @@ class MQTTService {
             const messageStr = messageBuffer.toString();
             const message = JSON.parse(messageStr);
 
+            // Global log for Terminal
+            store.dispatch('RECORD_MESSAGE', { message });
+
             if (window.ESPECTRUM_DEBUG) {
                 console.log('[MQTT] RX:', topic, message);
             }
@@ -120,7 +123,10 @@ class MQTTService {
      * Handle chat messages
      */
     handleChatMessage(message) {
-        store.dispatch('CHAT_MESSAGE_RECEIVED', message);
+        const currentMessages = store.getState().chatMessages || [];
+        store.dispatch('CHAT_MESSAGE_RECEIVED', {
+            chatMessages: [...currentMessages, message].slice(-50)
+        });
     }
 
     /**
@@ -149,17 +155,20 @@ class MQTTService {
                 }
             });
         }
-        // Chat Messages
-        else if (message.type === 'chat') {
-            store.dispatch('CHAT_MESSAGE_RECEIVED', {
-                chatMessages: [...store.getState().chatMessages, message].slice(-50)
-            });
+        // Wall of Sheep Data
+        else if (message.type === 'sheep_data') {
+            // Sheep UI subscribes to lastMessage via WILD-CARD store subscription
+            console.log('[Sheep] Captured Data:', message);
         }
         // Attack Logs
         else if (message.type === 'attack_log') {
             store.dispatch('ATTACK_LOG_RECEIVED', {
                 attackLogs: [message.entry, ...store.getState().attackLogs].slice(0, 50)
             });
+        }
+        // Packet Data (Traffic Matrix)
+        else if (message.type === 'packet_data') {
+            store.dispatch('PACKET_RECEIVED', { packet: message.data });
         }
         // WiFi Scan results
         else if (message.type === 'scan_result_wifi') {
