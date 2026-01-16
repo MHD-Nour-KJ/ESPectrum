@@ -92,7 +92,7 @@ export default class PageHardware {
     updateBLEUI() {
         const devices = store.getState().bleDevices;
         const tbody = document.getElementById('ble-list');
-        if (!tbody || devices.length === 0) return;
+        if (!tbody || !Array.isArray(devices) || devices.length === 0) return;
 
         tbody.innerHTML = devices.map(d => `
             <tr>

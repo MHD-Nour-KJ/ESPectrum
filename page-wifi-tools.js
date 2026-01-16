@@ -176,7 +176,7 @@ export default class PageWifiTools {
   updateScannerUI() {
     const networks = store.getState().wifiNetworks;
     const tbody = document.getElementById('network-list-body');
-    if (!tbody || networks.length === 0) return;
+    if (!tbody || !Array.isArray(networks) || networks.length === 0) return;
 
     tbody.innerHTML = networks.map(net => `
       <tr>

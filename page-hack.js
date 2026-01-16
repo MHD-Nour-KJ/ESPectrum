@@ -176,7 +176,7 @@ export default class PageHack {
         if (!logBox) return;
 
         const logs = store.getState().attackLogs;
-        if (logs.length === 0) return;
+        if (!Array.isArray(logs) || logs.length === 0) return;
 
         logBox.innerHTML = logs.map(log => `
             <div style="border-bottom: 1px solid #111; padding: 4px 0;">

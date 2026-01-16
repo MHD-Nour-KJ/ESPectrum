@@ -16,7 +16,6 @@ class Store {
             // Sensor data
             sensorData: {
                 touch: Array(10).fill(0),
-                hall: 0,
                 temp: 0,
                 rssi: -100,
                 uptime: 0
@@ -199,9 +198,15 @@ class Store {
         const output = { ...target };
 
         for (const key in source) {
-            if (source[key] instanceof Object && key in target) {
+            // If the value is an array, replace it entirely (don't merge items)
+            if (Array.isArray(source[key])) {
+                output[key] = source[key];
+            }
+            // If it's a plain object, merge recursively
+            else if (source[key] instanceof Object && key in target && !Array.isArray(target[key])) {
                 output[key] = this._deepMerge(target[key], source[key]);
-            } else {
+            }
+            else {
                 output[key] = source[key];
             }
         }
@@ -226,7 +231,6 @@ class Store {
             connectionAttempts: 0,
             sensorData: {
                 touch: Array(10).fill(0),
-                hall: 0,
                 temp: 0,
                 uptime: 0
             },

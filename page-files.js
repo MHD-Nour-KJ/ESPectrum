@@ -118,7 +118,7 @@ export default class PageFiles {
 
     const files = store.getState().fileList;
 
-    if (!files || files.length === 0) {
+    if (!Array.isArray(files) || files.length === 0) {
       tbody.innerHTML = '<tr><td colspan="3" class="text-center">No files found.</td></tr>';
       return;
     }

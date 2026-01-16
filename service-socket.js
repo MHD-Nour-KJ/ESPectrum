@@ -148,7 +148,6 @@ class MQTTService {
             store.dispatch('SENSOR_DATA_UPDATE', {
                 sensorData: {
                     touch: actualData.touch,
-                    hall: actualData.hall,
                     temp: actualData.temp,
                     rssi: actualData.rssi,
                     uptime: actualData.uptime
@@ -376,14 +375,13 @@ class MQTTService {
 
     generateMockData() {
         const touch = Array(10).fill(0).map(() => Math.random() > 0.85 ? Math.floor(Math.random() * 1000) : 0);
-        const hall = Math.floor(Math.sin(Date.now() / 5000) * 50 + Math.random() * 10);
         const temp = 38 + Math.sin(Date.now() / 10000) * 5 + Math.random() * 2;
         const uptime = Math.floor(performance.now() / 1000);
 
         return {
             type: 'sensor_data',
             timestamp: Math.floor(Date.now() / 1000),
-            data: { touch, hall, temp: parseFloat(temp.toFixed(2)), uptime }
+            data: { touch, temp: parseFloat(temp.toFixed(2)), uptime }
         };
     }
 

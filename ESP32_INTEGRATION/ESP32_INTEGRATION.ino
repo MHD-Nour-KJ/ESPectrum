@@ -53,8 +53,13 @@ String attackType = "";
 unsigned long attackEndTime = 0;
 
 // Sniffer Data
+// Sniffer Data
 unsigned long lastPacketSent = 0;
 const int packetInterval = 100; // Send max 1 packet per 100ms via MQTT
+
+// Sensor Timing
+unsigned long lastSensorUpdate = 0;
+const unsigned long sensorInterval = 2000;
 
 // ================= SNIFFER CALLBACK =================
 void sniffer_callback(void* buf, wifi_promiscuous_pkt_type_t type) {
@@ -383,11 +388,11 @@ void performBleScan() {
   if (count > 20) count = 20;
 
   for(int i=0; i<count; i++) {
-    NimBLEAdvertisedDevice device = results.getDevice(i);
+    auto device = results.getDevice(i);
     JsonObject dev = array.createNestedObject();
-    dev["name"] = device.getName().c_str();
-    dev["addr"] = device.getAddress().toString().c_str();
-    dev["rssi"] = device.getRSSI();
+    dev["name"] = device->getName().c_str();
+    dev["addr"] = device->getAddress().toString().c_str();
+    dev["rssi"] = device->getRSSI();
   }
   
   String output;
@@ -475,12 +480,6 @@ void sendSensorData() {
     touch.add(touchRead(touchPins[i]));
   }
   
-  // Hall (Classic ESP32 only check)
-  #if defined(ESP32) && !defined(ARDUINO_ESP32S2_DEV) && !defined(ARDUINO_ESP32S3_DEV) && !defined(ARDUINO_ESP32C3_DEV)
-    doc["hall"] = hallRead();
-  #else
-    doc["hall"] = 0;
-  #endif
 
   // Temp
   #ifdef SOC_TEMP_SENSOR_SUPPORTED

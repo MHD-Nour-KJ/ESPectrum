@@ -5,7 +5,6 @@
 
 import { createCard } from './ui-card.js';
 import TouchPinsWidget from './widget-touchpins.js';
-import HallSensorWidget from './widget-hallsensor.js';
 import TemperatureWidget from './widget-temperature.js';
 import DeepSleepWidget from './widget-sleep.js';
 import store from './app-store.js';
@@ -62,19 +61,6 @@ export default {
             <div id="touch-widget"></div>
           </div>
           
-          <!-- Hall Effect Sensor -->
-          <div class="glass-card fade-in-up" style="animation-delay: 0.1s;">
-            <div class="card-header" style="margin-bottom: var(--spacing-md);">
-              <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-                <i class="ph ph-magnet" style="color: var(--color-secondary);"></i>
-                Hall Effect Sensor
-              </h3>
-              <p style="margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--text-tertiary);">
-                Magnetic field strength · -128 to 127
-              </p>
-            </div>
-            <div id="hall-widget"></div>
-          </div>
           
           <!-- Temperature Gauge -->
           <div class="glass-card fade-in-up" style="animation-delay: 0.2s;">
@@ -126,11 +112,6 @@ export default {
     touchWidget.render();
     this.widgets.push(touchWidget);
 
-    // Hall Sensor Widget
-    const hallContainer = container.querySelector('#hall-widget');
-    const hallWidget = new HallSensorWidget(hallContainer);
-    hallWidget.render();
-    this.widgets.push(hallWidget);
 
     // Temperature Widget
     const tempContainer = container.querySelector('#temp-widget');
@@ -151,7 +132,8 @@ export default {
         if (!data) return;
 
         // Logging for verification (Phase 4 Debugging)
-        console.log(`[Dashboard] Data Received - Hall: ${data.hall}, Temp: ${data.temp}, RSSI: ${data.rssi}`);
+        // Logging for verification (Phase 4 Debugging)
+        console.log(`[Dashboard] Data Received - Temp: ${data.temp}, RSSI: ${data.rssi}`);
 
         // 1. Update Uptime & RSSI
         const uptimeDisplay = document.getElementById('uptime-display');
@@ -172,14 +154,9 @@ export default {
             this.widgets[0].update(data.touch);
           }
 
-          // Hall Sensor (Index 1) - ONLY update with data.hall
-          if (data.hall !== undefined) {
-            this.widgets[1].update(data.hall);
-          }
-
-          // Temperature (Index 2) - ONLY update with data.temp
+          // Temperature (Index 1) - ONLY update with data.temp
           if (data.temp !== undefined) {
-            this.widgets[2].update(data.temp);
+            this.widgets[1].update(data.temp);
           }
         }
       })
