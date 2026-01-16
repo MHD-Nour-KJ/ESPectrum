@@ -4,33 +4,46 @@
  */
 
 import store from './app-store.js';
+import mqtt from './service-socket.js';
+import { wrapCommand } from './utils-feedback.js';
+import { showToast } from './utils-helpers.js';
 
 export default class PageHardware {
-    constructor(type) {
-        this.type = type; // 'ble-scanner', 'ble-hid', 'ir', 'sheep'
+    constructor() {
+        this.unsubscribe = null;
     }
 
     async render(container) {
+        this.container = container;
         const route = window.location.hash.slice(1).split('?')[0];
 
         if (route === '/ble-scanner') {
-            this.renderBLEScanner(container);
+            this.renderBLEScanner();
         } else if (route === '/ble-hid') {
-            this.renderGhostKeyboard(container);
+            this.renderGhostKeyboard();
         } else if (route === '/ir-remote') {
-            this.renderIRRemote(container);
+            this.renderIRRemote();
         } else if (route === '/wall-of-sheep') {
-            this.renderWallOfSheep(container);
-        } else {
-            container.innerHTML = '<h2>Tool not found</h2>';
+            this.renderWallOfSheep();
         }
+
+        this.unsubscribe = store.subscribe('*', () => this.updateView());
 
         return () => this.cleanup();
     }
 
-    // ==================== BLE SCANNER ====================
-    renderBLEScanner(container) {
-        container.innerHTML = `
+    updateView() {
+        const route = window.location.hash.slice(1).split('?')[0];
+        if (route === '/ble-scanner') {
+            this.updateBLEUI();
+        } else if (route === '/wall-of-sheep') {
+            this.updateSheepUI();
+        }
+    }
+
+    // ==================== 1. BLE SCANNER ====================
+    renderBLEScanner() {
+        this.container.innerHTML = `
       <div class="tool-page fade-in-up">
         <div class="tool-header">
            <div class="icon-badge" style="background: rgba(50, 200, 50, 0.2); color: #4ade80;">
@@ -38,10 +51,11 @@ export default class PageHardware {
            </div>
            <div>
              <h1>BLE Scanner</h1>
-             <p>Detect nearby Bluetooth Low Energy devices & beacons</p>
+             <p>Track nearby Bluetooth Low Energy devices</p>
            </div>
+           <div style="flex:1;"></div>
            <button class="btn btn-primary" id="btn-scan-ble">
-             <i class="ph ph-magnifying-glass"></i> Scan BLE
+             <i class="ph ph-magnifying-glass"></i> Start Scan
            </button>
         </div>
 
@@ -49,48 +63,53 @@ export default class PageHardware {
           <table class="data-table">
              <thead>
                 <tr>
-                   <th>Device Name</th>
-                   <th>MAC Address</th>
-                   <th>RSSI</th>
-                   <th>Vendor</th>
+                   <th>Device / Name</th>
+                   <th>Address</th>
+                   <th>Signal</th>
+                   <th>Class</th>
                 </tr>
              </thead>
              <tbody id="ble-list">
-                <tr><td colspan="4" class="text-center">Click Scan to start...</td></tr>
+                <tr><td colspan="4" class="text-center">Awaiting scan command...</td></tr>
              </tbody>
           </table>
         </div>
       </div>
     `;
 
-        container.querySelector('#btn-scan-ble').addEventListener('click', () => {
-            if (window.wsService) {
-                window.wsService.send(JSON.stringify({ type: 'command', action: 'scan_ble' }));
-            }
-            document.getElementById('ble-list').innerHTML = '<tr><td colspan="4" class="text-center"><i class="ph ph-spinner ph-spin"></i> Scanning...</td></tr>';
+        const btn = this.container.querySelector('#btn-scan-ble');
+        btn?.addEventListener('click', () => {
+            wrapCommand(btn, async () => {
+                mqtt.send({ type: 'command', action: 'scan_ble' });
+                showToast('Scanning BLE Spectrum...', 'info');
+                await new Promise(r => setTimeout(r, 4000));
+            }, { successText: 'Finished' });
         });
 
-        // Listen for results
-        this.unsubscribe = store.subscribe('lastMessage', (msg) => {
-            if (msg && msg.type === 'scan_result_ble') {
-                const tbody = document.getElementById('ble-list');
-                if (tbody) {
-                    tbody.innerHTML = msg.devices.map(d => `
-                    <tr>
-                        <td><strong>${d.name || '(Unknown)'}</strong></td>
-                        <td class="mono text-muted">${d.addr}</td>
-                        <td>${d.rssi} dBm</td>
-                        <td>Unknown</td>
-                    </tr>
-                `).join('');
-                }
-            }
-        });
+        this.updateBLEUI();
     }
 
-    // ==================== GHOST KEYBOARD (HID) ====================
-    renderGhostKeyboard(container) {
-        container.innerHTML = `
+    updateBLEUI() {
+        const devices = store.getState().bleDevices;
+        const tbody = document.getElementById('ble-list');
+        if (!tbody || devices.length === 0) return;
+
+        tbody.innerHTML = devices.map(d => `
+            <tr>
+                <td>
+                    <div style="font-weight: 500;">${d.name || '<Unnamed>'}</div>
+                    <div class="text-tertiary" style="font-size: 0.75rem;">UUID: ${d.uuid || 'N/A'}</div>
+                </td>
+                <td class="mono" style="opacity: 0.7;">${d.addr}</td>
+                <td class="mono" style="color: ${d.rssi > -70 ? '#4ade80' : '#888'}">${d.rssi} dBm</td>
+                <td><span class="badge ${d.name ? 'status-connected' : 'status-mock'}">${d.name ? 'Device' : 'Beacon'}</span></td>
+            </tr>
+        `).join('');
+    }
+
+    // ==================== 2. GHOST KEYBOARD (HID) ====================
+    renderGhostKeyboard() {
+        this.container.innerHTML = `
       <div class="tool-page fade-in-up">
         <div class="tool-header">
            <div class="icon-badge" style="background: rgba(200, 50, 200, 0.2); color: #d946ef;">
@@ -98,89 +117,130 @@ export default class PageHardware {
            </div>
            <div>
              <h1>Ghost Keyboard</h1>
-             <p>Emulate a Bluetooth HID Keyboard to control paired devices</p>
+             <p>Emulate a Bluetooth HID Keyboard via ESP32</p>
            </div>
         </div>
 
-        <div class="grid grid-2 gap-lg" style="max-width: 800px; margin: 0 auto;">
-            <!-- Media Controls -->
-            <div class="glass-card text-center">
-                <h3>Media Control</h3>
-                <div class="grid grid-3 gap-sm mt-md">
-                    <button class="btn btn-icon" onclick="sendKey('vol_down')"><i class="ph ph-speaker-low"></i></button>
-                    <button class="btn btn-icon" onclick="sendKey('play_pause')"><i class="ph ph-play-pause"></i></button>
-                    <button class="btn btn-icon" onclick="sendKey('vol_up')"><i class="ph ph-speaker-high"></i></button>
+        <div class="grid grid-2 gap-lg" style="margin-top: 1rem;">
+            <div class="glass-card" style="padding: 1.5rem;">
+                <h3 class="mb-lg"><i class="ph ph-speaker-high"></i> Multimedia</h3>
+                <div class="flex gap-md wrap">
+                    <button class="btn btn-icon hid-key" data-key="vol_up" title="Vol Up"><i class="ph ph-speaker-high"></i></button>
+                    <button class="btn btn-icon hid-key" data-key="vol_down" title="Vol Down"><i class="ph ph-speaker-low"></i></button>
+                    <button class="btn btn-icon hid-key" data-key="play_pause" title="Play/Pause"><i class="ph ph-play-pause"></i></button>
+                    <button class="btn btn-icon hid-key" data-key="next" title="Next"><i class="ph ph-skip-forward"></i></button>
+                    <button class="btn btn-icon hid-key" data-key="mute" title="Mute"><i class="ph ph-speaker-slash"></i></button>
+                </div>
+                
+                <h3 class="mt-xl mb-lg"><i class="ph ph-desktop"></i> OS Controls</h3>
+                <div class="flex gap-md wrap">
+                    <button class="btn hid-key" data-key="lock_screen">Lock Screen</button>
+                    <button class="btn hid-key" data-key="brightness_up">Brighness +</button>
+                    <button class="btn hid-key" data-key="spotlight">Search</button>
                 </div>
             </div>
 
-            <!-- Pranks -->
-            <div class="glass-card text-center">
-                <h3>Prank Scripts</h3>
-                <div class="flex-col gap-sm mt-md">
-                    <button class="btn btn-primary" onclick="sendKey('type_hello')">Type "Hello World"</button>
-                    <button class="btn btn-accent" onclick="sendKey('cmd_space')">Open Spotlight (Cmd+Space)</button>
-                    <button class="btn" style="border-color: #ef4444; color: #ef4444;" onclick="sendKey('lock_screen')">Lock Screen</button>
+            <div class="glass-card" style="padding: 1.5rem;">
+                <h3 class="mb-md"><i class="ph ph-terminal"></i> Custom Injection</h3>
+                <div class="form-group">
+                    <textarea id="hid-content" class="input-dark" style="height: 120px; font-family: monospace;" placeholder="Type content here..."></textarea>
+                </div>
+                <button class="btn btn-primary mt-md" id="btn-send-text" style="width: 100%;">
+                    <i class="ph ph-paper-plane-right"></i> Inject Text
+                </button>
+                <div class="alert glass-card mt-md" style="font-size: 0.8rem; opacity: 0.6;">
+                    Device must be paired with "ESPectrum HID" via System Settings.
                 </div>
             </div>
         </div>
       </div>
     `;
 
-        // Define global helper for inline onClicks (lazy way, better to use addEventListener in real app)
-        window.sendKey = (key) => {
-            if (window.wsService) {
-                window.wsService.send(JSON.stringify({
-                    type: 'command',
-                    action: 'ble_hid_key',
-                    params: { key: key }
-                }));
-                alert(`Sent keystroke: ${key}`);
-            }
-        };
-    }
+        this.container.querySelectorAll('.hid-key').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.key;
+                mqtt.send({ type: 'command', action: 'ble_hid_key', params: { key } });
+                showToast(`Sent key: ${key}`, 'info');
+            });
+        });
 
-    // ==================== IR REMOTE ====================
-    renderIRRemote(container) {
-        container.innerHTML = `
-      <div class="tool-page fade-in-up text-center">
-           <div class="icon-badge" style="margin: 0 auto 1rem; background: rgba(255, 255, 255, 0.1);">
-              <i class="ph ph-television" style="font-size: 3rem;"></i>
-           </div>
-           <h1 style="margin-bottom: 0.5rem;">TV-B-Gone</h1>
-           <p style="margin-bottom: 3rem;">Universal IR Remote Power Blaster</p>
-
-           <button class="btn" id="btn-blast" style="
-               width: 200px; 
-               height: 200px; 
-               border-radius: 50%; 
-               background: radial-gradient(circle, #ef4444 0%, #991b1b 100%);
-               border: 4px solid #fecaca;
-               box-shadow: 0 0 50px rgba(239, 68, 68, 0.5);
-               font-size: 1.5rem;
-               text-transform: uppercase;
-           ">
-               <i class="ph ph-power" style="font-size: 4rem; display: block; margin-bottom: 0.5rem;"></i>
-               SHUT DOWN
-           </button>
-           
-           <p class="mt-lg text-muted">Point ESP32 (GPIO 4) at TV screens</p>
-      </div>
-    `;
-
-        container.querySelector('#btn-blast').addEventListener('click', () => {
-            if (window.wsService) {
-                window.wsService.send(JSON.stringify({ type: 'command', action: 'ir_blast_power' }));
-            }
-            // Haptic visual
-            const btn = container.querySelector('#btn-blast');
-            btn.style.transform = 'scale(0.95)';
-            setTimeout(() => btn.style.transform = 'scale(1)', 100);
+        const injectBtn = this.container.querySelector('#btn-send-text');
+        injectBtn?.addEventListener('click', () => {
+            const content = document.getElementById('hid-content').value;
+            if (!content) return;
+            wrapCommand(injectBtn, async () => {
+                mqtt.send({ type: 'command', action: 'ble_hid_type', params: { text: content } });
+                await new Promise(r => setTimeout(r, 1000));
+            }, { successText: 'Typed' });
         });
     }
 
-    // ==================== WALL OF SHEEP ====================
-    renderWallOfSheep(container) {
-        container.innerHTML = `
+    // ==================== 3. IR REMOTE ====================
+    renderIRRemote() {
+        this.container.innerHTML = `
+      <div class="tool-page fade-in-up text-center">
+           <div class="tool-header" style="justify-content: center;">
+               <div class="icon-badge" style="background: rgba(255, 255, 255, 0.1);">
+                  <i class="ph ph-television" style="font-size: 3rem;"></i>
+               </div>
+           </div>
+           
+           <h1 style="margin-bottom: 0.5rem;">TV-B-Gone</h1>
+           <p class="text-tertiary" style="margin-bottom: 3rem;">Universal IR Power Off sequence for 1,000+ TV brands</p>
+
+           <div class="blast-container">
+               <button class="btn" id="btn-blast">
+                   <i class="ph ph-power"></i>
+                   <span>SHUT DOWN</span>
+               </button>
+               <div class="blast-ring"></div>
+               <div class="blast-ring" style="animation-delay: 1s;"></div>
+           </div>
+           
+           <p class="mt-xl text-tertiary mono" style="font-size: 0.8rem;">
+               [GPIO 4] IR LED STATUS: <span class="status-connected">READY</span>
+           </p>
+      </div>
+
+      <style>
+          .blast-container { position: relative; width: 220px; height: 220px; margin: 0 auto; display: flex; align-items: center; justify-content: center; }
+          #btn-blast {
+               width: 180px; height: 180px; border-radius: 50%;
+               background: radial-gradient(circle, #ef4444 0%, #7f1d1d 100%);
+               border: 6px solid rgba(255,255,255,0.2);
+               box-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
+               font-size: 1.2rem; font-weight: 800; color: white;
+               display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+               transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+               z-index: 5;
+          }
+          #btn-blast:active { transform: scale(0.9); box-shadow: 0 0 10px rgba(239, 68, 68, 0.6); }
+          #btn-blast i { font-size: 3.5rem; }
+          .blast-ring {
+              position: absolute; inset: 0; border: 2px solid #ef4444; border-radius: 50%;
+              opacity: 0; pointer-events: none;
+          }
+          .blasting .blast-ring { animation: blast-out 2s cubic-bezier(0.165, 0.84, 0.44, 1) infinite; }
+          @keyframes blast-out {
+              0% { transform: scale(0.8); opacity: 0.8; }
+              100% { transform: scale(2); opacity: 0; }
+          }
+      </style>
+    `;
+
+        const blastBtn = this.container.querySelector('#btn-blast');
+        blastBtn?.addEventListener('click', () => {
+            const container = this.container.querySelector('.blast-container');
+            container.classList.add('blasting');
+            mqtt.send({ type: 'command', action: 'ir_blast_power' });
+            showToast('Transmitting IR codes...', 'error');
+            setTimeout(() => container.classList.remove('blasting'), 5000);
+        });
+    }
+
+    // ==================== 4. WALL OF SHEEP ====================
+    renderWallOfSheep() {
+        this.container.innerHTML = `
       <div class="tool-page fade-in-up">
         <div class="tool-header">
            <div class="icon-badge" style="background: rgba(255, 100, 50, 0.2); color: #ff6b35;">
@@ -188,26 +248,46 @@ export default class PageHardware {
            </div>
            <div>
              <h1>Wall of Sheep</h1>
-             <p>Live HTTP Traffic Sniffer (Unencrypted URLs)</p>
+             <p>Live unencrypted HTTP credentials & cookie metadata</p>
+           </div>
+           <div style="flex:1;"></div>
+           <div class="badge status-connected pulse">LISTENING</div>
+        </div>
+        
+        <div class="glass-card" style="margin-top: 1rem; height: 60vh; overflow: hidden; display: flex; flex-direction: column; background: #000; border-color: #7f1d1d;">
+           <div class="flex-between" style="background: rgba(127, 29, 29, 0.3); padding: 0.75rem 1rem; border-bottom: 1px solid #7f1d1d;">
+              <span class="mono" style="color: #fca5a5; font-size: 0.85rem;">Source -> Target</span>
+              <span class="badge" style="background: #991b1b;">FILTER: HTTP</span>
+           </div>
+           <div id="sheep-log" class="mono" style="flex:1; overflow-y: auto; padding: 1rem; color: #fecaca; font-size: 0.85rem;">
+               <div style="opacity: 0.4;">[${new Date().toLocaleTimeString()}] Sniffer active on GPIO radio interface...</div>
            </div>
         </div>
         
-        <div class="glass-card" style="height: 60vh; overflow-y: auto; font-family: monospace; background: #000;">
-           <div style="color: #22c55e;">> Initializing Promiscuous Sniffer...</div>
-           <div style="color: #22c55e;">> Filter: TCP Port 80 (HTTP)</div>
-           <div style="margin-top: 1rem;" id="sheep-log">
-               <!-- Logs go here -->
-               <div style="color: #777;">[10:42:01] 192.168.1.105 -> GET http://neverssl.com/</div>
-               <div style="color: #777;">[10:42:05] 192.168.1.112 -> POST http://insecure-login.com/auth</div>
-           </div>
+        <div class="alert glass-card mt-md" style="font-size: 0.8rem; border-color: rgba(239, 68, 68, 0.3);">
+            <i class="ph ph-info text-accent"></i>
+            Disclaimer: This tool is for educational purposes. Only sniffs unencrypted port 80 traffic.
         </div>
       </div>
     `;
     }
 
+    updateSheepUI() {
+        const logBox = document.getElementById('sheep-log');
+        const lastMsg = store.getState().lastMessage;
+        if (!logBox || !lastMsg || lastMsg.type !== 'sheep_data') return;
+
+        const div = document.createElement('div');
+        div.style.padding = '4px 0';
+        div.style.borderBottom = '1px solid #222';
+        div.innerHTML = `[${new Date().toLocaleTimeString()}] 
+                         <span style="color: #ef4444;">${lastMsg.ip}</span> 
+                         -> <span style="color: #facc15;">${lastMsg.path}</span> 
+                         <span style="color: #777;">(Captured: ${lastMsg.content})</span>`;
+        logBox.prepend(div);
+    }
+
     cleanup() {
         if (this.unsubscribe) this.unsubscribe();
-        // delete global
-        delete window.sendKey;
     }
 }

@@ -149,6 +149,46 @@ class MQTTService {
                 }
             });
         }
+        // Chat Messages
+        else if (message.type === 'chat') {
+            store.dispatch('CHAT_MESSAGE_RECEIVED', {
+                chatMessages: [...store.getState().chatMessages, message].slice(-50)
+            });
+        }
+        // Attack Logs
+        else if (message.type === 'attack_log') {
+            store.dispatch('ATTACK_LOG_RECEIVED', {
+                attackLogs: [message.entry, ...store.getState().attackLogs].slice(0, 50)
+            });
+        }
+        // WiFi Scan results
+        else if (message.type === 'scan_result_wifi') {
+            store.dispatch('WIFI_SCAN_COMPLETE', {
+                wifiNetworks: message.networks || []
+            });
+        }
+        // BLE Scan results
+        else if (message.type === 'scan_result_ble') {
+            store.dispatch('BLE_SCAN_COMPLETE', {
+                bleDevices: message.devices || []
+            });
+        }
+        // File List Response
+        else if (message.type === 'file_list') {
+            store.dispatch('FILES_UPDATED', {
+                fileList: message.data || []
+            });
+        }
+        // File Content Response
+        else if (message.type === 'file_content') {
+            store.dispatch('FILE_CONTENT_RECEIVED', {
+                currentFile: {
+                    path: message.path,
+                    content: message.content,
+                    loading: false
+                }
+            });
+        }
         // System Events (Sleep/Wake)
         else if (message.type === 'system_event') {
             if (message.event === 'wakeup') {

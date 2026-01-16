@@ -35,7 +35,22 @@ class Store {
 
             // UI state
             drawerOpen: false,
-            currentPage: 'home'
+            currentPage: 'home',
+
+            // File System State
+            fileList: [],
+            currentFile: {
+                path: '',
+                content: '',
+                loading: false
+            },
+
+            // Network Tools State
+            wifiNetworks: [],
+            bleDevices: [],
+            trafficData: [],
+            attackLogs: [],
+            chatMessages: []
         };
 
         this.subscribers = new Map();

@@ -473,6 +473,71 @@ p {
   color: var(--text-secondary);
 }
 
+/* ================= DASHBOARD HUD (Phase 4) ================= */
+.dashboard-page {
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-page::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  background-size: 100% 4px, 3px 100%;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0.15;
+}
+
+.dashboard-page::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+  pointer-events: none;
+  z-index: 101;
+}
+
+.glass-card {
+  position: relative;
+  box-shadow: 0 0 15px rgba(var(--color-primary-rgb), 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  box-shadow: 0 0 30px rgba(var(--color-primary-rgb), 0.15);
+  border-color: rgba(var(--color-primary-rgb), 0.4);
+  transform: translateY(-2px);
+}
+
+.glow-primary {
+  box-shadow: 0 0 20px rgba(var(--color-primary-rgb), 0.3);
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.dashboard-grid {
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+  /* Fix overflow on dashboard-grid */
+}
+
 .badge.status-connected {
   border-color: #10B981;
   color: #10B981;

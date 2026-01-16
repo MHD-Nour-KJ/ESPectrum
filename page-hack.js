@@ -5,151 +5,150 @@
  */
 
 import store from './app-store.js';
+import mqtt from './service-socket.js';
+import { wrapCommand } from './utils-feedback.js';
+import { showToast } from './utils-helpers.js';
 
 export default class PageHack {
     constructor() {
+        this.unsubscribe = null;
         this.attackType = '';
-        this.duration = 60; // default seconds
+        this.duration = 60;
         this.timerInterval = null;
     }
 
     async render(container) {
+        this.container = container;
         const route = window.location.hash.slice(1).split('?')[0];
 
-        // Determine Attack Type based on Route
         if (route === '/attack-rickroll') {
             this.attackType = 'rickroll';
-            this.renderAttackUI(container, 'Rick-Roll Beacon', 'Spams "Never Gonna Give You Up" lyrics as WiFi networks.', 'ph-music-notes');
+            this.renderAttackUI('Rick-Roll Beacon', 'Spams "Never Gonna Give You Up" lyrics as WiFi SSID beacons.', 'ph-music-notes', '#ef4444');
         } else if (route === '/attack-eviltwin') {
             this.attackType = 'eviltwin';
-            this.renderAttackUI(container, 'Evil Twin Portal', 'Creates an Open AP "Free_WiFi_Login" and captures credentials.', 'ph-mask-happy');
+            this.renderAttackUI('Evil Twin Portal', 'Spawns a fake "Free_WiFi_Login" AP to capture credentials.', 'ph-mask-happy', '#ef4444');
         } else if (route === '/attack-sour-apple') {
             this.attackType = 'sourapple';
-            this.renderAttackUI(container, 'Sour Apple Spammer', 'Floods BLE Advertising packets to annoy iOS devices.', 'ph-apple-logo');
-        } else {
-            container.innerHTML = '<h2>Tool not found</h2>';
+            this.renderAttackUI('Sour Apple', 'Floods BLE Advertising packets to trigger popups on iOS devices.', 'ph-apple-logo', '#f43f5e');
         }
+
+        this.unsubscribe = store.subscribe('*', () => this.updateView());
 
         return () => this.cleanup();
     }
 
-    renderAttackUI(container, title, desc, icon) {
-        container.innerHTML = `
+    updateView() {
+        this.renderLogs();
+    }
+
+    renderAttackUI(title, desc, icon, color) {
+        this.container.innerHTML = `
       <div class="tool-page fade-in-up">
-        
-        <!-- Header -->
         <div class="tool-header">
-           <div class="icon-badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; width: 80px; height: 80px; font-size: 2.5rem;">
+           <div class="icon-badge" style="background: rgba(${this.hexToRgb(color)}, 0.2); color: ${color}; width: 80px; height: 80px; font-size: 2.5rem;">
               <i class="ph ${icon}"></i>
            </div>
            <div>
-             <h1 style="color: #ef4444;">${title}</h1>
+             <h1 style="color: ${color};">${title}</h1>
              <p>${desc}</p>
            </div>
         </div>
 
-        <!-- Configuration Card -->
-        <div class="glass-card" style="padding: 2rem; max-width: 600px; margin: 0 auto;" id="config-panel">
-            <h3 style="margin-bottom: 1.5rem;">Attack Configuration</h3>
-            
-            <div class="alert alert-warning" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: flex-start;">
-                <i class="ph ph-warning" style="font-size: 1.5rem; color: #f59e0b;"></i>
-                <div>
-                    <strong style="color: #f59e0b;">Warning: Connection will be lost!</strong>
-                    <p style="margin: 0.5rem 0 0; font-size: 0.9rem; color: var(--text-secondary);">
-                        Starting this attack requires the ESP32 to switch radio modes. 
-                        It will <strong>disconnect from MQTT</strong> for the duration of the attack.
-                        The website will automatically reconnect when the timer ends.
-                    </p>
+        <div class="grid grid-2 gap-lg" style="margin-top: 1.5rem;">
+            <div class="glass-card" style="padding: 2rem;" id="config-panel">
+                <h3 class="mb-md">Target Parameters</h3>
+                
+                <div class="alert glass-card mb-md" style="border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.05);">
+                    <i class="ph ph-warning" style="color: #f59e0b;"></i>
+                    <div style="font-size: 0.85rem;">
+                        <strong>Network Disruption</strong>
+                        <p class="text-tertiary mt-xs">The ESP32 will disconnect from the cloud to focus radio power on the attack.</p>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-group" style="margin-bottom: 2rem;">
-                <label style="display: block; margin-bottom: 0.5rem;">Duration (Seconds)</label>
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <input type="range" id="duration-slider" min="10" max="120" step="10" value="60" style="flex: 1;">
-                    <span id="duration-val" class="mono" style="background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px;">60s</span>
+                <div class="form-group mb-lg">
+                    <div class="flex-between mb-sm">
+                        <label>Attack Duration</label>
+                        <span id="duration-val" class="badge">${this.duration}s</span>
+                    </div>
+                    <input type="range" id="duration-slider" min="10" max="300" step="10" value="60" style="width: 100%;">
                 </div>
+
+                <button class="btn btn-primary" id="btn-start-attack" style="width: 100%; height: 50px; background: ${color}; border:none;">
+                    <i class="ph ph-skull"></i> EXECUTE ATTACK
+                </button>
             </div>
 
-            <button class="btn btn-primary" id="btn-start" style="width: 100%; padding: 1rem; background: #ef4444; border-color: #dc2626;">
-                <i class="ph ph-skull"></i> START ATTACK
-            </button>
-        </div>
-
-        <!-- Active Attack Overlay (Hidden by default) -->
-        <div id="attack-overlay" style="display: none; text-align: center; padding: 3rem;">
-            <div class="pulse-ring" style="margin: 0 auto 2rem; width: 120px; height: 120px; border-radius: 50%; border: 4px solid #ef4444; display: flex; align-items: center; justify-content: center; position: relative;">
-                <span id="countdown" style="font-size: 2.5rem; font-weight: bold; font-family: monospace;">60</span>
-                <div class="ripple"></div>
+            <div id="results-panel" class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column;">
+               <h3 class="mb-md"><i class="ph ph-scroll"></i> Intelligence Log</h3>
+               <div id="attack-logs" class="mono" style="flex:1; background: #000; border-radius: 8px; padding: 1rem; color: #4ade80; font-size: 0.8rem; overflow-y: auto; max-height: 350px;">
+                  <div class="text-tertiary">Waiting for active session...</div>
+               </div>
             </div>
-            <h2>Attack in Progress...</h2>
-            <p class="text-muted">ESP32 is offline. Wait for reconnection.</p>
-            <button class="btn btn-secondary" id="btn-cancel" style="margin-top: 2rem;">
-               Force Reload (If stuck)
-            </button>
-        </div>
-        
-        <!-- Results Log (Example for Evil Twin) -->
-        <div id="results-panel" class="glass-card" style="display: none; margin-top: 2rem; padding: 2rem;">
-           <h3><i class="ph ph-scroll"></i> Attack Logs</h3>
-           <p>If any data was captured (e.g. credentials), it will appear here after reconnection.</p>
-           <pre style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px;">Waiting for logs...</pre>
         </div>
 
+        <!-- Progress Overlay -->
+        <div id="attack-overlay" class="hidden-overlay">
+            <div class="overlay-content">
+                <div class="timer-circle">
+                    <span id="countdown">${this.duration}</span>
+                    <div class="ring-loader"></div>
+                </div>
+                <h2 class="mt-lg">CRITICAL PHASE ACTIVE</h2>
+                <p class="text-tertiary">Radio Silence... Monitoring Targets Offline</p>
+                <button class="btn btn-secondary mt-lg" id="btn-emergency-abort">ABORT</button>
+            </div>
+        </div>
       </div>
-      
+
       <style>
-        .ripple {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            border: 2px solid #ef4444;
-            border-radius: 50%;
-            animation: ripple 1.5s infinite;
-        }
-        @keyframes ripple {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(1.5); opacity: 0; }
-        }
+        .hidden-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); z-index: 1000; align-items: center; justify-content: center; text-align: center; }
+        .hidden-overlay.active { display: flex; }
+        .timer-circle { width: 150px; height: 150px; border-radius: 50%; border: 4px solid #ef4444; margin: 0 auto; display: flex; align-items: center; justify-content: center; position: relative; font-size: 3rem; font-weight: bold; font-family: monospace; }
+        .ring-loader { position: absolute; inset: -10px; border: 2px solid rgba(239, 68, 68, 0.3); border-radius: 50%; border-top-color: #ef4444; animation: spin 2s linear infinite; }
       </style>
     `;
 
-        // Sliders
-        const slider = container.querySelector('#duration-slider');
-        const valDisplay = container.querySelector('#duration-val');
-        slider.addEventListener('input', (e) => {
-            valDisplay.textContent = e.target.value + 's';
-            this.duration = parseInt(e.target.value);
+        this.attachListeners();
+        this.renderLogs();
+    }
+
+    attachListeners() {
+        const slider = this.container.querySelector('#duration-slider');
+        const display = this.container.querySelector('#duration-val');
+        const startBtn = this.container.querySelector('#btn-start-attack');
+        const abortBtn = this.container.querySelector('#btn-emergency-abort');
+
+        slider?.addEventListener('input', (e) => {
+            this.duration = e.target.value;
+            if (display) display.textContent = `${this.duration}s`;
         });
 
-        // Start Button
-        container.querySelector('#btn-start').addEventListener('click', () => {
-            this.startAttack();
+        startBtn?.addEventListener('click', () => {
+            wrapCommand(startBtn, async () => {
+                this.executeAttack();
+                await new Promise(r => setTimeout(r, 1000));
+            }, { loadingText: 'Deploying...', successText: 'Active' });
         });
 
-        container.querySelector('#btn-cancel').addEventListener('click', () => {
+        abortBtn?.addEventListener('click', () => {
+            this.stopAttack();
             window.location.reload();
         });
     }
 
-    startAttack() {
-        // 1. Send Command to ESP32
-        if (window.wsService) {
-            window.wsService.send(JSON.stringify({
-                type: 'command',
-                action: 'start_attack',
-                params: {
-                    type: this.attackType,
-                    duration: this.duration
-                }
-            }));
-        }
+    executeAttack() {
+        // Send command
+        mqtt.send({
+            type: 'command',
+            action: 'start_attack',
+            params: { type: this.attackType, duration: this.duration }
+        });
 
-        // 2. Switch UI
-        document.getElementById('config-panel').style.display = 'none';
-        document.getElementById('attack-overlay').style.display = 'block';
+        // UI Transition
+        document.getElementById('attack-overlay')?.classList.add('active');
 
-        // 3. Start Frontend Timer
+        // Start Timer
         let remaining = this.duration;
         const countEl = document.getElementById('countdown');
 
@@ -158,37 +157,44 @@ export default class PageHack {
             if (countEl) countEl.textContent = remaining;
 
             if (remaining <= 0) {
-                this.finishAttack();
+                this.stopAttack();
             }
         }, 1000);
+
+        showToast(`${this.attackType.toUpperCase()} Attack Started`, 'error');
     }
 
-    finishAttack() {
+    stopAttack() {
         clearInterval(this.timerInterval);
+        document.getElementById('attack-overlay')?.classList.remove('active');
+        mqtt.retry(); // Force a reconnect now that radio is free
+        showToast('Attack sequence finished. Reconnecting...', 'info');
+    }
 
-        const countEl = document.getElementById('countdown');
-        if (countEl) countEl.innerHTML = '<i class="ph ph-check"></i>';
+    renderLogs() {
+        const logBox = document.getElementById('attack-logs');
+        if (!logBox) return;
 
-        document.querySelector('#attack-overlay h2').textContent = 'Attack Complete';
-        document.querySelector('#attack-overlay p').textContent = 'Reconnecting to ESP32...';
+        const logs = store.getState().attackLogs;
+        if (logs.length === 0) return;
 
-        // Attempt to trigger a reconnect if the library handles it, 
-        // or just wait for the periodic health check / natural status update
-        setTimeout(() => {
-            if (window.wsService) window.wsService.connect();
+        logBox.innerHTML = logs.map(log => `
+            <div style="border-bottom: 1px solid #111; padding: 4px 0;">
+                <span class="text-tertiary">[${new Date().toLocaleTimeString()}]</span> ${log}
+            </div>
+        `).join('');
+    }
 
-            // Show Results
-            document.getElementById('attack-overlay').style.display = 'none';
-            document.getElementById('config-panel').style.display = 'block';
-
-            const results = document.getElementById('results-panel');
-            if (results) results.style.display = 'block';
-
-            // Ideally fetch logs here
-        }, 3000);
+    hexToRgb(hex) {
+        hex = hex.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        return `${r}, ${g}, ${b}`;
     }
 
     cleanup() {
         if (this.timerInterval) clearInterval(this.timerInterval);
+        if (this.unsubscribe) this.unsubscribe();
     }
 }

@@ -223,3 +223,68 @@ export function formatBytes(bytes) {
 
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
+
+/**
+ * Show a toast notification
+ */
+export function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type} fade-in-up`;
+
+    let icon = 'ph-info';
+    if (type === 'success') icon = 'ph-check-circle';
+    if (type === 'error') icon = 'ph-warning-circle';
+
+    toast.innerHTML = `
+        <i class="ph ${icon}"></i>
+        <span>${message}</span>
+    `;
+
+    // Style the toast container if it doesn't exist
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+
+        const style = document.createElement('style');
+        style.textContent = `
+            #toast-container {
+                position: fixed;
+                bottom: 2rem;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 9999;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                pointer-events: none;
+            }
+            .toast {
+                background: rgba(15, 23, 42, 0.9);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.1);
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border-radius: 99px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+                pointer-events: all;
+                min-width: 200px;
+            }
+            .toast-success i { color: #22c55e; }
+            .toast-error i { color: #ef4444; }
+            .toast-info i { color: #3b82f6; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 500);
+    }, 3000);
+}
