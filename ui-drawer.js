@@ -109,6 +109,10 @@ export default class Drawer {
               <i class="ph ph-chat-circle-dots"></i>
               <span>Hacker Chat</span>
             </a>
+            <a href="#/reports" class="nav-link" data-route="/reports">
+              <i class="ph ph-file-pdf"></i>
+              <span>Cloud Reports</span>
+            </a>
           </div>
 
           <div class="nav-section">

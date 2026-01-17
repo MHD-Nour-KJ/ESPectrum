@@ -18,6 +18,7 @@ import pageHome from './page-home.js';
 import pageDashboard from './page-dashboard.js';
 import pageTerminal from './page-terminal.js';
 import pageAbout from './page-about.js';
+import pageReports from './page-reports.js';
 
 /**
  * Application class
@@ -113,6 +114,7 @@ class App {
         router.register('/', pageHome);
         router.register('/dashboard', pageDashboard);
         router.register('/terminal', pageTerminal);
+        router.register('/reports', new pageReports());
         router.register('/about', new pageAbout());
 
         // Hacker Board Routes

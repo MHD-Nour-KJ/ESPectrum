@@ -25,7 +25,8 @@ class Router {
             { path: '/attack-sour-apple', title: 'Sour Apple' },
             { path: '/ble-hid', title: 'Ghost Keyboard' },
             { path: '/defense', title: 'Deauth Detector' },
-            { path: '/chat', title: 'Hacker Chat' }
+            { path: '/chat', title: 'Hacker Chat' },
+            { path: '/reports', title: 'Cloud Reports' }
         ];
     }
 
