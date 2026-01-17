@@ -128,10 +128,10 @@ export default class PageReports {
 
         logs.forEach(log => {
             const row = [
-                new Date(log.timestamp).toLocaleString(),
-                log.category,
-                log.event,
-                `"${log.details.replace(/"/g, '""')}"`
+                `"${new Date(log.timestamp).toLocaleString()}"`,
+                `"${log.category}"`,
+                `"${log.event}"`,
+                `"${String(log.details).replace(/"/g, '""')}"`
             ];
             csvRows.push(row.join(','));
         });
@@ -140,20 +140,20 @@ export default class PageReports {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `ESPectrum_Audit_Log_${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `ESPectrum_Log_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
     }
 
     async generatePDF() {
-        if (!window.jspdf) {
-            showToast('PDF Library still loading, please wait...', 'warning');
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) {
+            showToast('PDF Engine not ready. Try again in 2 seconds.', 'warning');
             return;
         }
 
         const logs = await cloud.getLogs();
-        if (!logs) throw new Error('Could not fetch logs');
+        if (!logs || logs.length === 0) throw new Error('No data to export');
 
-        const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
 
         // --- Header ---
@@ -161,44 +161,48 @@ export default class PageReports {
         doc.rect(0, 0, 210, 40, 'F');
 
         doc.setTextColor(104, 74, 255);
-        doc.setFontSize(24);
-        doc.text("ESPECTRUM AUDIT REPORT", 14, 25);
+        doc.setFontSize(22);
+        doc.text("ESPECTRUM SECURITY REPORT", 14, 22);
 
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(10);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 34);
+        doc.setFontSize(9);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 32);
+        doc.text(`Scope: Full System Audit`, 14, 37);
 
         // --- Summary Section ---
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(16);
-        doc.text("Security Summary", 14, 55);
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(14);
+        doc.text("Activity Overview", 14, 55);
 
-        const securityEvents = logs.filter(l => l.category === 'Security' || l.category === 'Attack');
-        const fileEvents = logs.filter(l => l.category === 'File');
+        const security = logs.filter(l => l.category === 'Security');
+        const attacks = logs.filter(l => l.category === 'Attack');
 
-        doc.setFontSize(11);
-        doc.text(`Total Events Logged: ${logs.length}`, 14, 65);
-        doc.text(`Security Threats Detected: ${securityEvents.length}`, 14, 72);
-        doc.text(`File Operations Performed: ${fileEvents.length}`, 14, 79);
+        doc.setFontSize(10);
+        doc.text(`• Total Events: ${logs.length}`, 20, 65);
+        doc.text(`• Security Alerts: ${security.length}`, 20, 72);
+        doc.text(`• Offensive Actions: ${attacks.length}`, 20, 79);
 
         // --- Logs Table ---
-        const tableData = logs.reverse().slice(0, 100).map(l => [
+        const tableData = logs.slice(0, 500).map(l => [
             new Date(l.timestamp).toLocaleString(),
             l.category,
             l.event,
-            l.details.substring(0, 50) + (l.details.length > 50 ? '...' : '')
+            l.details.length > 60 ? l.details.substring(0, 57) + '...' : l.details
         ]);
 
-        doc.autoTable({
-            startY: 90,
-            head: [['Timestamp', 'Category', 'Event', 'Details']],
-            body: tableData,
-            theme: 'striped',
-            headStyles: { fillColor: [104, 74, 255] },
-            styles: { fontSize: 8 }
-        });
+        if (doc.autoTable) {
+            doc.autoTable({
+                startY: 90,
+                head: [['Timestamp', 'Category', 'Event', 'Details']],
+                body: tableData,
+                theme: 'striped',
+                headStyles: { fillColor: [104, 74, 255], fontSize: 9 },
+                styles: { fontSize: 7, cellPadding: 2 },
+                columnStyles: { 3: { cellWidth: 80 } }
+            });
+        }
 
-        doc.save(`ESPectrum_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+        doc.save(`ESPectrum_Audit_${Date.now()}.pdf`);
     }
 
     cleanup() { }

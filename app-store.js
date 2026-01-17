@@ -14,6 +14,7 @@ class Store {
             dbConnected: false,
             dbSyncing: false,
             lastDbSync: null,
+            radioMode: 'WiFi', // 'WiFi' or 'Bluetooth'
             connectionAttempts: 0,
 
             // Sensor data
@@ -103,6 +104,9 @@ class Store {
                 break;
             case 'CHAT_MESSAGE_RECEIVED':
                 updates = { chatMessages: payload.chatMessages };
+                break;
+            case 'RADIO_MODE_CHANGE':
+                updates = { radioMode: payload.mode };
                 break;
             case 'WS_STATUS_CHANGE':
             case 'HARDWARE_HEARTBEAT':

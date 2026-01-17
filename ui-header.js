@@ -26,6 +26,7 @@ export default class Header {
             <div id="mqtt-status" class="status-container"></div>
             <div id="hw-status" class="status-container"></div>
             <div id="db-status" class="status-container"></div>
+            <div id="radio-status" class="status-container"></div>
           </div>
           
           <div class="header-right">
@@ -96,13 +97,29 @@ export default class Header {
       }
       
       .header-center {
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
         display: flex;
         align-items: center;
         gap: 8px;
         justify-content: center;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        max-width: 40%;
+        scrollbar-width: none; /* Hide scrollbar for Chrome/Safari */
+      }
+      .header-center::-webkit-scrollbar { display: none; }
+      
+      @media (max-width: 768px) {
+        .header-center {
+          position: static;
+          transform: none;
+          max-width: unset;
+          flex: 1;
+          justify-content: center;
+        }
+        .header-content {
+          gap: 8px;
+        }
+        .led-text { display: none; }
       }
       
       /* LED Button Styles */
@@ -143,19 +160,21 @@ export default class Header {
          transform: scale(1.1);
          color: #F59E0B;
          fill: #F59E0B;
-         weight: fill;
       }
-      
       @media (max-width: 480px) {
-        .header-center {
-          display: none;
+        .header-content {
+          padding: 8px;
         }
-        
-        .led-text {
-          display: none; /* Hide text on very small screens to prevent overflow */
+        .header-center {
+          justify-content: flex-start; /* Left-aligned scrollable list */
+          padding: 0 4px;
+        }
+        .badge {
+          font-size: 0.75rem;
+          padding: 4px 8px;
         }
         .btn-led {
-          padding: 8px; /* Revert to square-ish on mobile */
+          padding: 8px;
           border-radius: 8px;
         }
       }
@@ -406,6 +425,22 @@ export default class Header {
         ${dText}
       </div>
     `;
+
+    // 4. Radio Mode Status
+    const radioContainer = document.getElementById('radio-status');
+    if (radioContainer) {
+      const isWiFi = state.radioMode === 'WiFi';
+      const rClass = isWiFi ? 'status-connected' : 'status-mock';
+      const rText = isWiFi ? 'WiFi Mode' : 'BLE Mode';
+      const rIcon = isWiFi ? 'ph-wifi-high' : 'ph-bluetooth';
+
+      radioContainer.innerHTML = `
+        <div class="badge ${rClass}" title="Current HW Radio Mode - Some features require switching">
+          <i class="ph ${rIcon}"></i>
+          ${rText}
+        </div>
+      `;
+    }
   }
 
   cleanup() {

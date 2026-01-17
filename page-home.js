@@ -170,6 +170,40 @@ export default {
             </div>
         </section>
 
+        <!-- SECTION E: TOOLS & COMMUNITY (The Cloud) -->
+        <section class="tour-section fade-in-up" style="animation-delay: 0.5s;">
+             <div class="section-header">
+                <div class="icon-badge" style="color: var(--color-primary);"><i class="ph ph-globe"></i></div>
+                <div>
+                   <h2>5. Intelligence & Tools</h2>
+                   <p>Connected features for reporting and real-time communication.</p>
+                </div>
+            </div>
+            <div class="grid-dashboard">
+                <a href="#/chat" class="dashboard-card glass-card">
+                   <i class="ph ph-chat-circle-dots card-icon" style="color: var(--color-primary);"></i>
+                   <div class="card-info">
+                     <h3>Hacker Chat</h3>
+                     <p>Global Messaging</p>
+                   </div>
+                </a>
+                <a href="#/reports" class="dashboard-card glass-card">
+                   <i class="ph ph-file-pdf card-icon" style="color: #EF4444;"></i>
+                   <div class="card-info">
+                     <h3>Cloud Reports</h3>
+                     <p>Audit & Export</p>
+                   </div>
+                </a>
+                <a href="#/terminal" class="dashboard-card glass-card">
+                   <i class="ph ph-terminal-window card-icon" style="color: #10B981;"></i>
+                   <div class="card-info">
+                     <h3>Serial Terminal</h3>
+                     <p>Low-level Shell</p>
+                   </div>
+                </a>
+            </div>
+        </section>
+
       </div>
     `;
 

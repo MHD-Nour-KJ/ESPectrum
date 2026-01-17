@@ -4,6 +4,7 @@
  */
 
 import store from './app-store.js';
+import { showToast } from './utils-helpers.js';
 
 const CLOUD_DB_URL = "https://script.google.com/macros/s/AKfycbwLn_sZ1WVJ3mJvlhFVMYzQ8ll9MGceax4Z8KlT7XH08OM11PWSKej1KO9E7WAQKZw/exec";
 
@@ -41,10 +42,16 @@ class CloudService {
 
             const data = await response.json();
 
+            const wasConnected = store.getState().dbConnected;
+            if (!wasConnected) showToast('Cloud Database Connected', 'success');
+
             store.dispatch('DB_STATUS_CHANGE', { dbConnected: true, lastDbSync: Date.now() });
             return data;
         } catch (error) {
             console.error('[Cloud] Request Failed:', error);
+            const wasConnected = store.getState().dbConnected;
+            if (wasConnected) showToast('Cloud Database Offline', 'error');
+
             store.dispatch('DB_STATUS_CHANGE', { dbConnected: false });
             return null;
         } finally {

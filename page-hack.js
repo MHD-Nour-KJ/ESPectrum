@@ -6,6 +6,7 @@
 
 import store from './app-store.js';
 import mqtt from './service-socket.js';
+import cloud from './service-cloud.js';
 import { wrapCommand } from './utils-feedback.js';
 import { showToast } from './utils-helpers.js';
 
@@ -162,6 +163,7 @@ export default class PageHack {
         }, 1000);
 
         showToast(`${this.attackType.toUpperCase()} Attack Started`, 'error');
+        cloud.log('Attack', 'Started', `${this.attackType} for ${this.duration}s`);
     }
 
     stopAttack() {
@@ -169,6 +171,7 @@ export default class PageHack {
         document.getElementById('attack-overlay')?.classList.remove('active');
         mqtt.retry(); // Force a reconnect now that radio is free
         showToast('Attack sequence finished. Reconnecting...', 'info');
+        cloud.log('Attack', 'Finished', this.attackType);
     }
 
     renderLogs() {

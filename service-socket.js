@@ -5,6 +5,7 @@
 
 import store from './app-store.js';
 import cloud from './service-cloud.js';
+import { showToast } from './utils-helpers.js';
 
 class MQTTService {
     constructor() {
@@ -94,6 +95,7 @@ class MQTTService {
         });
 
         cloud.log('System', 'MQTT Connected', `Client: ${this.clientId}`);
+        showToast('MQTT Broker Online', 'success');
     }
 
     /**
@@ -148,6 +150,7 @@ class MQTTService {
         if (!wasHardwareConnected) {
             console.log('[MQTT] 🟢 Hardware Reconnected. Syncing state...');
             cloud.log('System', 'ESP32 Connected', 'Hardware heartbeat detected');
+            showToast('ESP32 Hardware Online', 'success');
 
             const desiredLedState = store.getState().ledState;
             this.send({ type: 'command', action: 'toggle_led', params: { state: desiredLedState } });
@@ -171,8 +174,15 @@ class MQTTService {
         // Wall of Sheep Data
         else if (message.type === 'sheep_data') {
             console.log('[Sheep] Captured Data:', message);
-            cloud.log('Security', 'Evil Twin Credential Captured',
-                `SSID: ${message.ssid || 'Unknown'}, User: ${message.user || 'Unknown'}, Pass: ${message.pass || 'Unknown'}`);
+            const content = message.content || '';
+            const isCreds = content.includes(':');
+
+            if (isCreds) {
+                const [user, pass] = content.split(':');
+                cloud.log('Security', 'Credential Captured', `User: ${user}, Pass: ${pass} (IP: ${message.ip || '?'})`);
+            } else {
+                cloud.log('Security', 'Traffic Snippet', content);
+            }
         }
         // Attack Logs
         else if (message.type === 'attack_log') {
@@ -202,6 +212,9 @@ class MQTTService {
             // Sync to Database
             cloud.log('Security', 'BLE Scan Finished', `Found ${devices.length} devices`);
             cloud.saveBleScan(devices);
+
+            // Revert Radio state locally
+            store.dispatch('RADIO_MODE_CHANGE', { mode: 'WiFi' });
         }
         // Security Alerts (Deauth, etc)
         else if (message.type === 'security_alert') {
@@ -235,6 +248,7 @@ class MQTTService {
                     systemStatus: 'connected'
                 });
                 this.showWakeupNotification(message.data);
+                showToast('ESP32 System Wakeup Detected', 'info');
             }
         }
     }
@@ -258,6 +272,7 @@ class MQTTService {
             connected: false,
             systemStatus: 'disconnected'
         });
+        showToast('MQTT Connection Lost', 'error');
 
         // Attempt reconnect if not explicitly closed
         this.attemptReconnect();
@@ -331,6 +346,12 @@ class MQTTService {
      */
     send(message) {
         if (this.client && this.client.connected) {
+            if (message.type === 'command') {
+                if (message.action === 'scan_ble' || message.action.startsWith('ble_')) {
+                    store.dispatch('RADIO_MODE_CHANGE', { mode: 'Bluetooth' });
+                }
+            }
+
             const payload = JSON.stringify(message);
 
             // Route to correct topic
@@ -396,6 +417,7 @@ class MQTTService {
                 console.warn('[Watchdog] ESP32 Heartbeat lost.');
                 store.dispatch('HARDWARE_OFFLINE', { hardwareConnected: false });
                 cloud.log('System', 'ESP32 Connection Lost', 'No heartbeat for 5s');
+                showToast('ESP32 Link Lost', 'error');
             }
         }, 1000);
     }
