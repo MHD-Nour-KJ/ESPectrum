@@ -187,19 +187,21 @@ class MQTTService {
         }
         // WiFi Scan results
         else if (message.type === 'scan_result_wifi') {
-            const count = (message.networks || []).length;
-            store.dispatch('WIFI_SCAN_COMPLETE', {
-                wifiNetworks: message.networks || []
-            });
-            cloud.log('BLE', 'WiFi Scan Finished', `Found ${count} networks`);
+            const networks = message.networks || [];
+            store.dispatch('WIFI_SCAN_COMPLETE', { wifiNetworks: networks });
+
+            // Sync to Database
+            cloud.log('Security', 'WiFi Scan Finished', `Found ${networks.length} networks`);
+            cloud.saveWifiScan(networks);
         }
         // BLE Scan results
         else if (message.type === 'scan_result_ble') {
-            const count = (message.devices || []).length;
-            store.dispatch('BLE_SCAN_COMPLETE', {
-                bleDevices: message.devices || []
-            });
-            cloud.log('BLE', 'BLE Scan Finished', `Found ${count} devices`);
+            const devices = message.devices || [];
+            store.dispatch('BLE_SCAN_COMPLETE', { bleDevices: devices });
+
+            // Sync to Database
+            cloud.log('Security', 'BLE Scan Finished', `Found ${devices.length} devices`);
+            cloud.saveBleScan(devices);
         }
         // Security Alerts (Deauth, etc)
         else if (message.type === 'security_alert') {

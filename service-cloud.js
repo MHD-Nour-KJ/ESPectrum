@@ -127,6 +127,35 @@ class CloudService {
             lastAction
         }, true);
     }
+
+    /**
+     * Batch logs WiFi scan results
+     */
+    async saveWifiScan(networks) {
+        if (!Array.isArray(networks) || networks.length === 0) return;
+        return await this._request({
+            action: 'saveWifiScan',
+            networks
+        }, true);
+    }
+
+    /**
+     * Batch logs BLE scan results
+     */
+    async saveBleScan(devices) {
+        if (!Array.isArray(devices) || devices.length === 0) return;
+        return await this._request({
+            action: 'saveBleScan',
+            devices
+        }, true);
+    }
+
+    /**
+     * Fetches full logs for reporting
+     */
+    async getLogs() {
+        return await this._request({ action: 'getLogs' });
+    }
 }
 
 const cloud = new CloudService();
