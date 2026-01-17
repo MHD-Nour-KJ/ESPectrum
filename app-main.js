@@ -117,8 +117,6 @@ class App {
         router.register('/reports', new pageReports());
         router.register('/about', new pageAbout());
 
-        // Hacker Board Routes
-
         // 1. WiFi Tools
         import('./page-wifi-tools.js').then(module => {
             const PageWifiTools = module.default;
@@ -129,7 +127,7 @@ class App {
             router.register('/defense', wifiTools);
         });
 
-        // 2. Attack Tools (Hacker Mode)
+        // 2. Attack Tools
         import('./page-hack.js').then(module => {
             const PageHack = module.default;
             const hackTools = new PageHack();
@@ -138,29 +136,16 @@ class App {
             router.register('/attack-sour-apple', hackTools);
         });
 
-        // 3. File System
-        import('./page-files.js').then(module => {
-            const PageFiles = module.default;
-            const fileTools = new PageFiles();
-            router.register('/files', fileTools);
-            router.register('/editor', fileTools);
-        });
+        // 3. Hardware Tools (BLE, IR, etc.)
+        import('./page-ble-scanner.js').then(m => router.register('/ble-scanner', new m.default()));
+        import('./page-ble-hid.js').then(m => router.register('/ble-hid', new m.default()));
+        import('./page-ir.js').then(m => router.register('/ir-remote', new m.default()));
 
-        // 4. Hardware Tools (BLE, IR, Sheep)
-        import('./page-hardware.js').then(module => {
-            const PageHardware = module.default;
-            const hardwareTools = new PageHardware();
-            router.register('/ble-scanner', hardwareTools); // View is determined by hash in render method
-            router.register('/ble-hid', hardwareTools);
-            router.register('/ir-remote', hardwareTools);
-            router.register('/wall-of-sheep', hardwareTools);
-        });
-
-        // 5. Chat
-        import('./page-chat.js').then(module => {
-            const PageChat = module.default;
-            router.register('/chat', new PageChat());
-        });
+        // 4. Intelligence & Files
+        import('./page-sheep.js').then(m => router.register('/wall-of-sheep', new m.default()));
+        import('./page-chat.js').then(m => router.register('/chat', new m.default()));
+        import('./page-files.js').then(m => router.register('/files', new m.default()));
+        import('./page-hardware.js').then(m => router.register('/editor', new m.default()));
 
         console.log('✓ Routes registered');
     }
