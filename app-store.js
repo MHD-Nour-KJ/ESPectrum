@@ -15,7 +15,7 @@ class Store {
 
             // Sensor data
             sensorData: {
-                touch: Array(10).fill(0),
+                touch: Array(2).fill(0),
                 temp: 0,
                 rssi: -100,
                 uptime: 0

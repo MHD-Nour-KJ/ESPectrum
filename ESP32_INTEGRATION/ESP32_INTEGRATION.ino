@@ -59,7 +59,7 @@ const int packetInterval = 100; // Send max 1 packet per 100ms via MQTT
 
 // Sensor Timing
 unsigned long lastSensorUpdate = 0;
-const unsigned long sensorInterval = 2000;
+const unsigned long sensorInterval = 200; // Faster updates for reactive touch animations
 
 // ================= SNIFFER CALLBACK =================
 void sniffer_callback(void* buf, wifi_promiscuous_pkt_type_t type) {
@@ -284,6 +284,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
     else if (strcmp(action, "toggle_led") == 0) {
         bool state = doc["params"]["state"];
+        // Ensure explicit HIGH/LOW
         digitalWrite(2, state ? HIGH : LOW);
         client.publish(topic_data, state ? "{\"type\":\"status\",\"msg\":\"LED ON\"}" : "{\"type\":\"status\",\"msg\":\"LED OFF\"}");
     }
@@ -473,10 +474,10 @@ void sendSensorData() {
   doc["type"] = "sensor_data";
   doc["timestamp"] = millis() / 1000;
   
-  // Touch
+  // Touch - Only using T8 (GPIO33) and T9 (GPIO32) to avoid conflicts
   JsonArray touch = doc.createNestedArray("touch");
-  int touchPins[] = {4, 0, 2, 15, 13, 12, 14, 27, 33, 32};
-  for (int i = 0; i < 10; i++) {
+  int touchPins[] = {33, 32};
+  for (int i = 0; i < 2; i++) {
     touch.add(touchRead(touchPins[i]));
   }
   

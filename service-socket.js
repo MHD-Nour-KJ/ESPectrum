@@ -374,7 +374,12 @@ class MQTTService {
     }
 
     generateMockData() {
-        const touch = Array(10).fill(0).map(() => Math.random() > 0.85 ? Math.floor(Math.random() * 1000) : 0);
+        // High (2200) when untouched, drops when touched
+        const touch = Array(2).fill(0).map(() => {
+            const untouched = 2100 + Math.random() * 100;
+            const touched = 100 + Math.random() * 400;
+            return Math.random() > 0.85 ? touched : untouched;
+        });
         const temp = 38 + Math.sin(Date.now() / 10000) * 5 + Math.random() * 2;
         const uptime = Math.floor(performance.now() / 1000);
 
