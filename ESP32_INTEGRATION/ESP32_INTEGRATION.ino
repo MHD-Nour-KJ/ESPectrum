@@ -38,6 +38,9 @@ DNSServer dnsServer;
 WebServer webServer(80);
 BleKeyboard bleKeyboard("ESPectrum-Keyboard", "Google", 100);
 
+// Persistence across Deep Sleep
+RTC_DATA_ATTR int lastSleepDuration = 0;
+
 // Radio Management
 enum RadioMode { RADIO_WIFI_STA, RADIO_WIFI_AP, RADIO_BLE };
 RadioMode currentRadio = RADIO_WIFI_STA;
@@ -150,11 +153,13 @@ void setup() {
     Serial.println("LittleFS Mounted");
   }
 
-  // Init BLE
+  // 1. Init WiFi (Priority)
+  setupWiFi();
+  
+  // 2. Init BLE (Secondary)
+  delay(2000); // Radio stabilization
   NimBLEDevice::init("ESPectrum-Node");
 
-  // Init WiFi & MQTT
-  setupWiFi();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
   client.setBufferSize(MQTT_BUFFER_SIZE);
@@ -297,6 +302,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         client.publish(topic_data, out.c_str());
         
         Serial.printf("Entering Deep Sleep for %d seconds\n", duration);
+        lastSleepDuration = duration; // Save to RTC memory
         client.loop(); // Flush MQTT
         delay(1000);   // Give MQTT time to send
         
@@ -630,13 +636,37 @@ void stopBLE() {
 
 
 void setupWiFi() {
+  Serial.printf("Connecting to WiFi: %s\n", ssid);
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.disconnect(); // Clear previous states
+  delay(100);
+  
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 40) { // 20 second timeout
     delay(500);
     Serial.print(".");
+    attempts++;
+    
+    if (attempts % 10 == 0) {
+        Serial.printf("\nStatus: %d\n", WiFi.status());
+        // Status 4 is WL_CONNECT_FAILED, 6 is WL_DISCONNECTED
+        if (WiFi.status() == 4) {
+            Serial.println("Connect Failed. Retrying...");
+            WiFi.begin(ssid, password);
+        }
+    }
   }
-  Serial.println("\nWiFi Connected");
+
+  if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\nWiFi Connected!");
+      Serial.print("IP Address: ");
+      Serial.println(WiFi.localIP());
+  } else {
+      Serial.println("\nWiFi Connection Failed! Starting in Offline Mode.");
+  }
 }
 
 void reconnect() {
@@ -656,7 +686,7 @@ void reconnect() {
           wakeup["event"] = "wakeup";
           JsonObject data = wakeup.createNestedObject("data");
           data["wakeup_reason"] = "Timer";
-          data["sleep_duration"] = 0; // Duration is handled by web side or we could store it in RTC if critical
+          data["sleep_duration"] = lastSleepDuration;
           
           String out;
           serializeJson(wakeup, out);
