@@ -342,32 +342,57 @@ class MQTTService {
     }
 
     /**
-     * Send command to ESP32
+     * Send message. Gatekeeper for hardware-bound commands.
      */
     send(message) {
-        if (this.client && this.client.connected) {
-            if (message.type === 'command') {
-                if (message.action === 'scan_ble' || message.action.startsWith('ble_')) {
-                    store.dispatch('RADIO_MODE_CHANGE', { mode: 'Bluetooth' });
-                }
+        const state = store.getState();
+        const isMqttConnected = this.client && this.client.connected;
+        const isHardwareConnected = state.hardwareConnected;
+
+        // Define what constitutes a "Critical Device Action"
+        const isDeviceAction = ['command', 'file_cmd'].includes(message.type) ||
+            message.action === 'toggle_led' ||
+            message.action?.startsWith('ble_');
+
+        if (isDeviceAction) {
+            // 1. Check Broker Connection
+            if (!isMqttConnected) {
+                showToast('Action Blocked: MQTT Broker is offline', 'error');
+                console.error('[MQTT] Blocked device command: Broker Offline', message);
+                return false;
+            }
+
+            // 2. Check Hardware Heartbeat (unless in Mock Mode)
+            if (!isHardwareConnected && !this.mockMode) {
+                showToast('Action Blocked: ESP32 Hardware is currently offline', 'error');
+                console.error('[MQTT] Blocked device command: ESP32 Offline', message);
+                return false;
+            }
+        }
+
+        // Proceed with publishing if MQTT is connected
+        if (isMqttConnected) {
+            // Harmony Log: Radio mode switching visualization
+            if (message.action === 'scan_ble' || message.action?.startsWith('ble_')) {
+                store.dispatch('RADIO_MODE_CHANGE', { mode: 'Bluetooth' });
             }
 
             const payload = JSON.stringify(message);
-
-            // Route to correct topic
-            let topic = this.topicCommand;
-            if (message.type === 'chat') {
-                topic = this.topicChat;
-            }
+            const topic = message.type === 'chat' ? this.topicChat : this.topicCommand;
 
             this.client.publish(topic, payload);
 
             if (window.ESPECTRUM_DEBUG) {
                 console.log('[MQTT] TX:', topic, message);
             }
+            return true;
         } else {
-            console.warn('[MQTT] Cannot send, not connected');
-            // If in mock mode, simulate logic could go here if needed
+            // Fallback for chat etc when disconnected
+            if (message.type === 'chat') {
+                showToast('Cannot send chat: Disconnected from cloud', 'warning');
+            }
+            console.warn('[MQTT] Send failed: Offline', message);
+            return false;
         }
     }
 
