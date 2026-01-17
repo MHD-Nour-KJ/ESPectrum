@@ -5,6 +5,7 @@
 
 import store from './app-store.js';
 import mqtt from './service-socket.js';
+import cloud from './service-cloud.js';
 
 export default class PageChat {
     constructor() {
@@ -25,6 +26,9 @@ export default class PageChat {
              <p>Anonymous communication channel via MQTT</p>
            </div>
            <div style="flex:1;"></div>
+           <button class="btn btn-icon text-accent" id="btn-clear-chat" title="Delete All History" style="margin-right: 1rem;">
+              <i class="ph ph-trash"></i>
+           </button>
            <div class="badge status-connected">ID: ${this.userId}</div>
         </div>
 
@@ -72,6 +76,9 @@ export default class PageChat {
                 chatMessages: [...store.getState().chatMessages, { user: this.userId, text, me: true }].slice(-50)
             });
 
+            // Cloud Save
+            cloud.addChat(this.userId, text);
+
             input.value = '';
         };
 
@@ -80,10 +87,35 @@ export default class PageChat {
             if (e.key === 'Enter') sendMessage();
         });
 
+        // Clear Chat Listener
+        const clearBtn = container.querySelector('#btn-clear-chat');
+        clearBtn?.addEventListener('click', () => {
+            if (confirm('Permanently delete all secure chat history?')) {
+                cloud.deleteChat();
+                store.dispatch('CHAT_MESSAGE_RECEIVED', { chatMessages: [] });
+            }
+        });
+
         this.unsubscribe = store.subscribe('chatMessages', () => this.renderMessages());
+
+        // Initial load from cloud
+        this.loadCloudHistory();
         this.renderMessages();
 
         return () => this.cleanup();
+    }
+
+    async loadCloudHistory() {
+        const history = await cloud.getChat();
+        if (history && history.length > 0) {
+            // Map GAS format to local chat format
+            const formatted = history.map(h => ({
+                user: h.user,
+                text: h.message,
+                me: h.user === this.userId
+            }));
+            store.dispatch('CHAT_MESSAGE_RECEIVED', { chatMessages: formatted });
+        }
     }
 
     renderMessages() {

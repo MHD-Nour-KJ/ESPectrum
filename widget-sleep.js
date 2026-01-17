@@ -5,6 +5,7 @@
 
 import store from './app-store.js';
 import { hapticFeedback } from './utils-helpers.js';
+import cloud from './service-cloud.js';
 
 export default class DeepSleepWidget {
   constructor(container) {
@@ -114,6 +115,9 @@ export default class DeepSleepWidget {
       }
     });
 
+    // Cloud Log
+    cloud.log('System', 'Entering Deep Sleep', `Duration: ${duration}s`);
+
     // Update UI
     this.isSleeping = true;
     this.showSleepingStatus();
@@ -198,6 +202,9 @@ export default class DeepSleepWidget {
 
     // Haptic feedback for success
     hapticFeedback(200);
+
+    // Cloud Log
+    cloud.log('System', 'System Wakeup', `Reason: ${data.reason}, Duration: ${data.duration}s`);
   }
 
   cleanup() {

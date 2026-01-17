@@ -5,6 +5,7 @@
 
 import store from './app-store.js';
 import mqtt from './service-socket.js';
+import cloud from './service-cloud.js';
 import { wrapCommand } from './utils-feedback.js';
 import { showToast, formatBytes } from './utils-helpers.js';
 
@@ -154,8 +155,16 @@ export default class PageFiles {
         const path = btn.dataset.file;
         if (confirm(`Are you sure you want to delete ${path}?`)) {
           wrapCommand(btn, async () => {
+            // Find file size for logging
+            const file = store.getState().fileList.find(f => f.name === path);
+            const size = file ? file.size : 0;
+
             mqtt.send({ type: 'file_cmd', action: 'delete', path });
             showToast(`Requested deletion of ${path}`, 'info');
+
+            // Cloud Log
+            cloud.logFile(path, size, 'Deleted');
+            cloud.log('File', 'File Deleted', `${path} (${formatBytes(size)})`);
           });
         }
       });
@@ -196,6 +205,10 @@ export default class PageFiles {
         content
       });
       showToast(`Uploading ${file.name}...`, 'info');
+
+      // Cloud Log
+      cloud.logFile(file.name, file.size, 'Uploaded');
+      cloud.log('File', 'File Uploaded', `${file.name} (${formatBytes(file.size)})`);
     };
     reader.readAsText(file);
   }
@@ -284,9 +297,16 @@ export default class PageFiles {
 
     saveBtn?.addEventListener('click', () => {
       const content = textArea.value;
+      const size = new Blob([content]).size;
+
       wrapCommand(saveBtn, async () => {
         mqtt.send({ type: 'file_cmd', action: 'write', path, content });
         showToast(`Saving ${path}...`, 'info');
+
+        // Cloud Log
+        cloud.logFile(path, size, 'Edited');
+        cloud.log('File', 'File Edited', `${path} (${formatBytes(size)})`);
+
         await new Promise(r => setTimeout(r, 1000));
       }, { successText: 'Saved' });
     });

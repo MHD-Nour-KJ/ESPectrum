@@ -4,6 +4,7 @@
  */
 
 import store from './app-store.js';
+import cloud from './service-cloud.js';
 
 export default class Header {
   constructor(container) {
@@ -24,6 +25,7 @@ export default class Header {
           <div class="header-center">
             <div id="mqtt-status" class="status-container"></div>
             <div id="hw-status" class="status-container"></div>
+            <div id="db-status" class="status-container"></div>
           </div>
           
           <div class="header-right">
@@ -244,17 +246,19 @@ export default class Header {
     let isLedOn = false;
 
     ledBtn?.addEventListener('click', () => {
-      isLedOn = !isLedOn;
-      if (isLedOn) {
-        ledBtn.classList.add('active');
-        ledBtn.querySelector('i').classList.replace('ph-lightbulb', 'ph-lightbulb-filament');
-      } else {
-        ledBtn.classList.remove('active');
-        ledBtn.querySelector('i').classList.replace('ph-lightbulb-filament', 'ph-lightbulb');
-      }
+      const newState = !store.getState().ledState;
+
+      // 1. Update Local Store (Instant feedback)
+      store.dispatch('LED_STATE_UPDATE', { ledState: newState });
+
+      // 2. Send to Hardware
       if (window.wsService) {
-        window.wsService.send({ type: 'command', action: 'toggle_led', params: { state: isLedOn } });
+        window.wsService.send({ type: 'command', action: 'toggle_led', params: { state: newState } });
       }
+
+      // 3. Save to Cloud
+      cloud.saveConfig('led_builtin_state', newState);
+      cloud.log('System', 'LED Toggled', `State: ${newState ? 'ON' : 'OFF'}`);
     });
 
     // Clicking status badges refreshes connection
@@ -264,12 +268,32 @@ export default class Header {
 
     document.getElementById('mqtt-status')?.addEventListener('click', handleStatusClick);
     document.getElementById('hw-status')?.addEventListener('click', handleStatusClick);
+    document.getElementById('db-status')?.addEventListener('click', () => {
+      // Cloud manual refresh?
+    });
   }
 
   subscribeToStore() {
     this.unsubscribe = store.subscribe('*', () => {
       this.updateConnectionStatus();
+      this.updateLEDUI();
     });
+  }
+
+  updateLEDUI() {
+    const ledBtn = document.getElementById('led-btn');
+    if (!ledBtn) return;
+
+    const isLedOn = store.getState().ledState;
+    const icon = ledBtn.querySelector('i');
+
+    if (isLedOn) {
+      ledBtn.classList.add('active');
+      if (icon) icon.classList.replace('ph-lightbulb', 'ph-lightbulb-filament');
+    } else {
+      ledBtn.classList.remove('active');
+      if (icon) icon.classList.replace('ph-lightbulb-filament', 'ph-lightbulb');
+    }
   }
 
   initSmartScroll() {
@@ -290,7 +314,8 @@ export default class Header {
   updateConnectionStatus() {
     const mqttContainer = document.getElementById('mqtt-status');
     const hwContainer = document.getElementById('hw-status');
-    if (!mqttContainer || !hwContainer) return;
+    const dbContainer = document.getElementById('db-status');
+    if (!mqttContainer || !hwContainer || !dbContainer) return;
 
     const state = store.getState();
 
@@ -357,6 +382,28 @@ export default class Header {
       <div class="badge ${hClass}" title="ESP32 Hardware Status - Click to Refresh">
         <i class="ph ${hIcon}"></i>
         ${hText}
+      </div>
+    `;
+
+    // 3. Database / Google Sheets Status
+    let dClass = 'status-disconnected';
+    let dText = 'DB: Offline';
+    let dIcon = 'ph-database';
+
+    if (state.dbSyncing) {
+      dClass = 'status-connecting';
+      dText = 'DB: Syncing...';
+      dIcon = 'ph-arrows-clockwise';
+    } else if (state.dbConnected) {
+      dClass = 'status-connected';
+      dText = 'DB: Online';
+      dIcon = 'ph-database';
+    }
+
+    dbContainer.innerHTML = `
+      <div class="badge ${dClass}" title="Database (Google Sheets) Connectivity Status">
+        <i class="ph ${dIcon} ${state.dbSyncing ? 'spin-icon' : ''}"></i>
+        ${dText}
       </div>
     `;
   }

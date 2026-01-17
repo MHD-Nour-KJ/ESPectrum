@@ -14,8 +14,8 @@
 #include <WebServer.h>
 
 // ================= CONFIGURATION =================
-const char* ssid     = "NourKH";
-const char* password = "NOURKH0933508762";
+const char* ssid     = "Vpn";
+const char* password = "@@2021##";
 
 // Flespi MQTT
 const char* mqtt_server = "mqtt.flespi.io";

@@ -4,6 +4,7 @@
  */
 
 import store from './app-store.js';
+import cloud from './service-cloud.js';
 
 class MQTTService {
     constructor() {
@@ -91,6 +92,8 @@ class MQTTService {
             mockMode: false,
             systemStatus: 'connected'
         });
+
+        cloud.log('System', 'MQTT Connected', `Client: ${this.clientId}`);
     }
 
     /**
@@ -134,10 +137,21 @@ class MQTTService {
      */
     handleDataMessage(message) {
         // Update Heartbeat on ANY message from ESP32
+        const wasHardwareConnected = store.getState().hardwareConnected;
+
         store.dispatch('HARDWARE_HEARTBEAT', {
             hardwareConnected: true,
             lastHeartbeat: Date.now()
         });
+
+        // 🟢 Harmony: If hardware JUST reconnected, sync desired state (LED, etc.)
+        if (!wasHardwareConnected) {
+            console.log('[MQTT] 🟢 Hardware Reconnected. Syncing state...');
+            cloud.log('System', 'ESP32 Connected', 'Hardware heartbeat detected');
+
+            const desiredLedState = store.getState().ledState;
+            this.send({ type: 'command', action: 'toggle_led', params: { state: desiredLedState } });
+        }
 
         // Sensor Data
         if (message.type === 'sensor_data') {
@@ -156,14 +170,16 @@ class MQTTService {
         }
         // Wall of Sheep Data
         else if (message.type === 'sheep_data') {
-            // Sheep UI subscribes to lastMessage via WILD-CARD store subscription
             console.log('[Sheep] Captured Data:', message);
+            cloud.log('Security', 'Evil Twin Credential Captured',
+                `SSID: ${message.ssid || 'Unknown'}, User: ${message.user || 'Unknown'}, Pass: ${message.pass || 'Unknown'}`);
         }
         // Attack Logs
         else if (message.type === 'attack_log') {
             store.dispatch('ATTACK_LOG_RECEIVED', {
                 attackLogs: [message.entry, ...store.getState().attackLogs].slice(0, 50)
             });
+            cloud.log('Attack', 'Sequence Log', message.entry);
         }
         // Packet Data (Traffic Matrix)
         else if (message.type === 'packet_data') {
@@ -171,15 +187,23 @@ class MQTTService {
         }
         // WiFi Scan results
         else if (message.type === 'scan_result_wifi') {
+            const count = (message.networks || []).length;
             store.dispatch('WIFI_SCAN_COMPLETE', {
                 wifiNetworks: message.networks || []
             });
+            cloud.log('BLE', 'WiFi Scan Finished', `Found ${count} networks`);
         }
         // BLE Scan results
         else if (message.type === 'scan_result_ble') {
+            const count = (message.devices || []).length;
             store.dispatch('BLE_SCAN_COMPLETE', {
                 bleDevices: message.devices || []
             });
+            cloud.log('BLE', 'BLE Scan Finished', `Found ${count} devices`);
+        }
+        // Security Alerts (Deauth, etc)
+        else if (message.type === 'security_alert') {
+            cloud.log('Security', message.alert_type || 'Alert', message.details || 'Detected malicious activity');
         }
         // File List Response
         else if (message.type === 'file_list') {
@@ -369,6 +393,7 @@ class MQTTService {
             if (state.hardwareConnected && timeSinceLastSeen > 5000) {
                 console.warn('[Watchdog] ESP32 Heartbeat lost.');
                 store.dispatch('HARDWARE_OFFLINE', { hardwareConnected: false });
+                cloud.log('System', 'ESP32 Connection Lost', 'No heartbeat for 5s');
             }
         }, 1000);
     }

@@ -11,6 +11,9 @@ class Store {
             mockMode: false,
             hardwareConnected: false,
             lastHeartbeat: 0,
+            dbConnected: false,
+            dbSyncing: false,
+            lastDbSync: null,
             connectionAttempts: 0,
 
             // Sensor data
@@ -20,6 +23,7 @@ class Store {
                 rssi: -100,
                 uptime: 0
             },
+            ledState: false,
 
             // System events
             systemStatus: 'initializing', // 'initializing', 'connected', 'disconnected', 'error'
@@ -103,6 +107,10 @@ class Store {
             case 'WS_STATUS_CHANGE':
             case 'HARDWARE_HEARTBEAT':
             case 'HARDWARE_OFFLINE':
+            case 'DB_STATUS_CHANGE':
+            case 'DB_SYNCING_CHANGE':
+            case 'UPDATE_THEME':
+            case 'LED_STATE_UPDATE':
                 // These actions are expected to have payload directly as updates
                 updates = payload;
                 break;

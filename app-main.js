@@ -11,6 +11,7 @@ import Header from './ui-header.js';
 import Drawer from './ui-drawer.js';
 import Footer from './ui-footer.js';
 import HelpSystem from './ui-help.js';
+import cloud from './service-cloud.js';
 
 // Import pages
 import pageHome from './page-home.js';
@@ -59,7 +60,10 @@ class App {
         // 7. Connect MQTT
         await this.connectMQTT();
 
-        // 8. Add global error handler
+        // 8. Initialize Cloud Database
+        await this.initCloudDB();
+
+        // 9. Add global error handler
         this.addErrorHandler();
 
         console.log('%c✨ ESPectrum Ready!', 'color: #10B981; font-size: 14px; font-weight: bold;');
@@ -165,6 +169,33 @@ class App {
             console.log('✓ MQTT service started');
         } catch (err) {
             console.warn('⚠ MQTT connection failed', err);
+        }
+    }
+
+    async initCloudDB() {
+        try {
+            console.log('☁ Connecting to Database...');
+            const config = await cloud.getConfig();
+            if (config) {
+                console.log('✓ Cloud Database connected');
+
+                // Apply cloud config to store
+                if (config.theme) store.dispatch('UPDATE_THEME', { theme: config.theme });
+                if (config.led_builtin_state !== undefined) {
+                    store.dispatch('LED_STATE_UPDATE', { ledState: config.led_builtin_state === 'true' });
+                }
+
+                // Initial log
+                cloud.log('System', 'Web Interface Online', 'User session started');
+            }
+
+            // Start periodic heartbeat/sync (every 30s)
+            setInterval(async () => {
+                await cloud.getConfig();
+            }, 30000);
+
+        } catch (err) {
+            console.warn('⚠ Cloud Database connection failed', err);
         }
     }
 
