@@ -13,15 +13,16 @@
 #include <DNSServer.h>
 #include <WebServer.h>
 #include <BleKeyboard.h>
+#include "secrets.h"
+
 
 // ================= CONFIGURATION =================
-const char* ssid     = "Vpn";
-const char* password = "@@2021##";
+// (Parameters now loaded from secrets.h)
 
 // Flespi MQTT
 const char* mqtt_server = "mqtt.flespi.io";
 const int mqtt_port     = 1883;
-const char* mqtt_token  = "AS2wNDPtK056fOhQAQdcEOdx3ceJ0dPmEioS81O0q2ytBvxW8FM5uIcQ3m3C4FOc";
+
 
 // Topics
 const char* topic_data    = "espectrum/data";

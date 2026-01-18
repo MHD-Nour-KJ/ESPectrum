@@ -1,3 +1,5 @@
+import Chart from 'chart.js/auto';
+
 /**
  * ESPectrum - Radial Gauge Chart
  * Chart.js doughnut chart styled as a radial gauge
@@ -18,11 +20,6 @@ export default class RadialGauge {
     }
 
     init() {
-        if (!window.Chart) {
-            console.error('[RadialGauge] Chart.js not loaded');
-            return;
-        }
-
         const percentage = ((this.value - this.min) / (this.max - this.min)) * 100;
 
         this.chart = new Chart(this.canvas, {

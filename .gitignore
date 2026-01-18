@@ -1,0 +1,18 @@
+# IDE
+.vscode/
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+secrets.h
+ESP32_INTEGRATION/secrets.h
+
+# Misc
+.DS_Store

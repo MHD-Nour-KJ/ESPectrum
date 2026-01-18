@@ -77,44 +77,9 @@
         <div id="app-footer"></div>
     </div>
 
-    <!-- CDN Dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-    <!-- File Protocol Warning Overlay -->
-    <div id="file-protocol-warning"
-        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0F0C29; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem;">
-        <h1 style="color: #EF4444; font-family: sans-serif; margin-bottom: 1rem;">⚠️ Browser Security Restriction</h1>
-        <p style="color: white; font-family: sans-serif; font-size: 1.25rem; max-width: 600px; line-height: 1.6;">
-            Modern browsers block <strong>ES6 Modules</strong> when opening files directly from your computer
-            (<code>file://</code> protocol).
-        </p>
-        <div
-            style="background: rgba(255,255,255,0.1); padding: 1.5rem; border-radius: 12px; margin: 2rem 0; text-align: left;">
-            <p style="color: #FFE14A; font-family: monospace; margin: 0 0 1rem;">To fix this, you must use a local
-                server:</p>
-            <ol style="color: #E2E8F0; font-family: sans-serif; margin: 0; padding-left: 1.5rem; line-height: 1.8;">
-                <li>Open terminal in this folder</li>
-                <li>Run: <code
-                        style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">python -m http.server</code>
-                </li>
-                <li>Go to: <a href="http://localhost:8000" style="color: #684AFF;">http://localhost:8000</a></li>
-            </ol>
-        </div>
-        <button onclick="location.reload()"
-            style="background: #684AFF; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer;">Reload
-            Page</button>
-    </div>
 
-    <script>
-        // Check if running via file protocol
-        if (window.location.protocol === 'file:') {
-            document.getElementById('file-protocol-warning').style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-            throw new Error('ES6 Modules cannot run via file:// protocol. Please use a local server.');
-        }
-    </script>
+
 
     <!-- Main Application (ES6 Module) -->
     <script type="module" src="app-main.js"></script>

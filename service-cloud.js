@@ -6,7 +6,7 @@
 import store from './app-store.js';
 import { showToast } from './utils-helpers.js';
 
-const CLOUD_DB_URL = "https://script.google.com/macros/s/AKfycbwLn_sZ1WVJ3mJvlhFVMYzQ8ll9MGceax4Z8KlT7XH08OM11PWSKej1KO9E7WAQKZw/exec";
+const CLOUD_DB_URL = "/api/db";
 
 class CloudService {
     constructor() {
@@ -15,7 +15,7 @@ class CloudService {
     }
 
     /**
-     * Generic fetch helper for GAS (handles redirects)
+     * Generic fetch helper (now hits our secure proxy)
      */
     async _request(params = {}, isPost = false) {
         try {
@@ -26,7 +26,7 @@ class CloudService {
                 method: isPost ? 'POST' : 'GET',
                 mode: 'cors',
                 headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
+                    'Content-Type': 'application/json',
                 }
             };
 
@@ -41,6 +41,7 @@ class CloudService {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
+
 
             const wasConnected = store.getState().dbConnected;
             if (!wasConnected) showToast('Cloud Database Connected', 'success');

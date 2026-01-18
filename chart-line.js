@@ -1,3 +1,5 @@
+import Chart from 'chart.js/auto';
+
 /**
  * ESPectrum - Line Chart Wrapper
  * Chart.js wrapper for real-time line charts
@@ -95,11 +97,6 @@ export default class LineChart {
     }
 
     init() {
-        if (!window.Chart) {
-            console.error('[LineChart] Chart.js not loaded');
-            return;
-        }
-
         this.chart = new Chart(this.canvas, this.defaultOptions);
     }
 

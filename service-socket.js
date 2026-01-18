@@ -3,6 +3,7 @@
  * Handles real-time communication via MQTT
  */
 
+import mqtt from 'mqtt';
 import store from './app-store.js';
 import cloud from './service-cloud.js';
 import { showToast } from './utils-helpers.js';
@@ -10,7 +11,7 @@ import { showToast } from './utils-helpers.js';
 class MQTTService {
     constructor() {
         this.client = null;
-        this.token = 'AS2wNDPtK056fOhQAQdcEOdx3ceJ0dPmEioS81O0q2ytBvxW8FM5uIcQ3m3C4FOc';
+        this.token = import.meta.env.VITE_MQTT_TOKEN;
         this.clientId = 'espectrum-web-' + Math.random().toString(16).substr(2, 8);
         this.topicData = 'espectrum/data';
         this.topicTelemetry = 'espectrum/telemetry';
