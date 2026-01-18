@@ -139,13 +139,24 @@ class App {
         // 3. Hardware Tools (BLE, IR, etc.)
         import('./page-ble-scanner.js').then(m => router.register('/ble-scanner', new m.default()));
         import('./page-ble-hid.js').then(m => router.register('/ble-hid', new m.default()));
-        import('./page-ir.js').then(m => router.register('/ir-remote', new m.default()));
+
+        import('./page-hardware.js').then(module => {
+            const hardware = new module.default();
+            router.register('/ir-remote', hardware);
+            router.register('/wall-of-sheep', hardware);
+            // We can also let the dedicated page handle it if preferred, 
+            // but page-hardware has the active TV-B-Gone code.
+        });
 
         // 4. Intelligence & Files
-        import('./page-sheep.js').then(m => router.register('/wall-of-sheep', new m.default()));
+        import('./page-sheep.js').then(m => router.register('/wall-of-sheep-v2', new m.default()));
         import('./page-chat.js').then(m => router.register('/chat', new m.default()));
-        import('./page-files.js').then(m => router.register('/files', new m.default()));
-        import('./page-hardware.js').then(m => router.register('/editor', new m.default()));
+
+        import('./page-files.js').then(module => {
+            const files = new module.default();
+            router.register('/files', files);
+            router.register('/editor', files);
+        });
 
         console.log('✓ Routes registered');
     }

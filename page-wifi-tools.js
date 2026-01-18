@@ -7,6 +7,7 @@ import store from './app-store.js';
 import mqtt from './service-socket.js';
 import { wrapCommand } from './utils-feedback.js';
 import { showToast } from './utils-helpers.js';
+import Chart from 'chart.js/auto';
 
 export default class PageWifiTools {
   constructor() {

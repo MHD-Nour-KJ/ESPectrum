@@ -14,6 +14,7 @@
     "dependencies": {
         "mqtt": "^5.0.0",
         "chart.js": "^4.4.0",
-        "animejs": "^3.2.1"
+        "animejs": "^3.2.1",
+        "prismjs": "^1.29.0"
     }
 }

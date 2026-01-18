@@ -9,6 +9,16 @@ import cloud from './service-cloud.js';
 import { wrapCommand } from './utils-feedback.js';
 import { showToast, formatBytes } from './utils-helpers.js';
 
+// Import Prism for syntax highlighting
+import Prism from 'prismjs';
+import 'prismjs/themes/prism-tomorrow.css';
+import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-bash';
+import 'prismjs/components/prism-c';
+import 'prismjs/components/prism-cpp';
+import 'prismjs/components/prism-python';
+
 export default class PageFiles {
   constructor() {
     this.unsubscribe = null;
@@ -251,7 +261,6 @@ export default class PageFiles {
     `;
 
     this.addEditorStyles();
-    this.injectPrism();
     this.attachEditorListeners(path);
 
     // Load initial content
@@ -259,28 +268,6 @@ export default class PageFiles {
     this.showEditorLoading(true);
   }
 
-  injectPrism() {
-    if (document.getElementById('prism-styles')) return;
-
-    const link = document.createElement('link');
-    link.id = 'prism-styles';
-    link.rel = 'stylesheet';
-    link.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css';
-    document.head.appendChild(link);
-
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js';
-    script.onload = () => {
-      // Load components
-      const components = ['json', 'javascript', 'bash', 'c', 'cpp', 'python'];
-      components.forEach(lang => {
-        const s = document.createElement('script');
-        s.src = `https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-${lang}.min.js`;
-        document.head.appendChild(s);
-      });
-    };
-    document.head.appendChild(script);
-  }
 
   attachEditorListeners(path) {
     const textArea = this.container.querySelector('#code-area');
@@ -315,7 +302,7 @@ export default class PageFiles {
   syncHighlight() {
     const textArea = document.getElementById('code-area');
     const display = document.getElementById('editor-highlight');
-    if (!textArea || !display || !window.Prism) return;
+    if (!textArea || !display || !Prism) return;
 
     const path = new URLSearchParams(window.location.hash.split('?')[1]).get('path') || '';
     let lang = 'javascript';
@@ -324,7 +311,7 @@ export default class PageFiles {
     if (path.endsWith('.c') || path.endsWith('.cpp')) lang = 'cpp';
 
     const code = textArea.value + '\n'; // Add newline to ensure last line is visible
-    display.innerHTML = window.Prism.highlight(code, window.Prism.languages[lang] || window.Prism.languages.javascript, lang);
+    display.innerHTML = Prism.highlight(code, Prism.languages[lang] || Prism.languages.javascript, lang);
   }
 
   updateEditorContent() {
